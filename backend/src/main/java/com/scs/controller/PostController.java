@@ -31,12 +31,12 @@ public class PostController {
 
     @GetMapping("/user/{userId}")
     public List<Post> listByUser(@PathVariable Long userId) {
-        return repo.findByUserIdOrderByCreatedAtDesc(userId);
+        return repo.findByUser_IdOrderByCreatedAtDesc(userId);
     }
 
     @GetMapping("/vendor/{vendorId}")
     public List<Post> listByVendor(@PathVariable Long vendorId) {
-        return repo.findByVendorIdOrderByCreatedAtDesc(vendorId);
+        return repo.findByVendor_IdOrderByCreatedAtDesc(vendorId);
     }
 
     @GetMapping("/{id}")

@@ -29,7 +29,7 @@ public class MenuItemController {
 
     @GetMapping("/vendor/{vendorId}")
     public List<MenuItem> listByVendor(@PathVariable Long vendorId) {
-        return repo.findByVendorId(vendorId);
+        return repo.findByVendor_Id(vendorId);
     }
 
     @GetMapping("/{id}")

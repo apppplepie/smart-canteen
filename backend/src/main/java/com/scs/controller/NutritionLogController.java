@@ -31,7 +31,7 @@ public class NutritionLogController {
 
     @GetMapping("/user/{userId}")
     public List<NutritionLog> listByUser(@PathVariable Long userId) {
-        return repo.findByUserIdOrderByRecordedAtDesc(userId);
+        return repo.findByUser_IdOrderByRecordedAtDesc(userId);
     }
 
     @GetMapping("/{id}")

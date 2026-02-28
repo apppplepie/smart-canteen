@@ -33,7 +33,7 @@ public class OrderItemController {
 
     @GetMapping("/order/{orderId}")
     public List<OrderItem> listByOrder(@PathVariable Long orderId) {
-        return repo.findByOrderId(orderId);
+        return repo.findByOrder_Id(orderId);
     }
 
     @GetMapping("/{id}")

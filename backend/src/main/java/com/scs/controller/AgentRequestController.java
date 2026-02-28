@@ -28,7 +28,7 @@ public class AgentRequestController {
 
     @GetMapping("/user/{userId}")
     public List<AgentRequest> listByUser(@PathVariable Long userId) {
-        return repo.findByUserIdOrderByCreatedAtDesc(userId);
+        return repo.findByUser_IdOrderByCreatedAtDesc(userId);
     }
 
     @GetMapping("/{id}")

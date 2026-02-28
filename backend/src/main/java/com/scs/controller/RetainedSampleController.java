@@ -28,7 +28,7 @@ public class RetainedSampleController {
 
     @GetMapping("/vendor/{vendorId}")
     public List<RetainedSample> listByVendor(@PathVariable Long vendorId) {
-        return repo.findByVendorId(vendorId);
+        return repo.findByVendor_Id(vendorId);
     }
 
     @GetMapping("/{id}")

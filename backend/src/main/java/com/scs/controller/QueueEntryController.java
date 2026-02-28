@@ -31,7 +31,7 @@ public class QueueEntryController {
 
     @GetMapping("/vendor/{vendorId}")
     public List<QueueEntry> listByVendor(@PathVariable Long vendorId) {
-        return repo.findByVendorIdOrderByCreatedAtAsc(vendorId);
+        return repo.findByVendor_IdOrderByCreatedAtAsc(vendorId);
     }
 
     @GetMapping("/{id}")

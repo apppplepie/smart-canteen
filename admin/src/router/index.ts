@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from "vue-router"
 import { createRouter } from "vue-router"
+import { getDataTableTitle } from "@@/constants/data-tables"
 import { routerConfig } from "@/router/config"
 import { registerNavigationGuard } from "@/router/guard"
 import { flatMultiLevelRoutes } from "./helper"
@@ -46,13 +47,13 @@ export const constantRoutes: RouteRecordRaw[] = [
       hidden: true
     }
   },
+  { path: "/", redirect: "/dashboard", meta: { hidden: true } },
   {
-    path: "/",
+    path: "/dashboard",
     component: Layouts,
-    redirect: "/dashboard",
     children: [
       {
-        path: "dashboard",
+        path: "",
         component: () => import("@/pages/dashboard/index.vue"),
         name: "Dashboard",
         meta: {
@@ -64,167 +65,37 @@ export const constantRoutes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: "/demo",
+    path: "/data",
     component: Layouts,
-    redirect: "/demo/unocss",
-    name: "Demo",
+    redirect: "/data/users",
+    name: "DataManagement",
     meta: {
-      title: "示例集合",
-      elIcon: "DataBoard"
+      title: "数据管理",
+      elIcon: "Folder",
+      alwaysShow: true
     },
     children: [
-      {
-        path: "unocss",
-        component: () => import("@/pages/demo/unocss/index.vue"),
-        name: "UnoCSS",
-        meta: {
-          title: "UnoCSS"
-        }
-      },
-      {
-        path: "element-plus",
-        component: () => import("@/pages/demo/element-plus/index.vue"),
-        name: "ElementPlus",
-        meta: {
-          title: "Element Plus",
-          keepAlive: true
-        }
-      },
-      {
-        path: "vxe-table",
-        component: () => import("@/pages/demo/vxe-table/index.vue"),
-        name: "VxeTable",
-        meta: {
-          title: "Vxe Table",
-          keepAlive: true
-        }
-      },
-      {
-        path: "level2",
-        component: () => import("@/pages/demo/level2/index.vue"),
-        redirect: "/demo/level2/level3",
-        name: "Level2",
-        meta: {
-          title: "二级路由",
-          alwaysShow: true
-        },
-        children: [
-          {
-            path: "level3",
-            component: () => import("@/pages/demo/level2/level3/index.vue"),
-            name: "Level3",
-            meta: {
-              title: "三级路由",
-              keepAlive: true
-            }
-          }
-        ]
-      },
-      {
-        path: "composable-demo",
-        redirect: "/demo/composable-demo/use-fetch-select",
-        name: "ComposableDemo",
-        meta: {
-          title: "组合式函数"
-        },
-        children: [
-          {
-            path: "use-fetch-select",
-            component: () => import("@/pages/demo/composable-demo/use-fetch-select.vue"),
-            name: "UseFetchSelect",
-            meta: {
-              title: "useFetchSelect"
-            }
-          },
-          {
-            path: "use-fullscreen-loading",
-            component: () => import("@/pages/demo/composable-demo/use-fullscreen-loading.vue"),
-            name: "UseFullscreenLoading",
-            meta: {
-              title: "useFullscreenLoading"
-            }
-          },
-          {
-            path: "use-watermark",
-            component: () => import("@/pages/demo/composable-demo/use-watermark.vue"),
-            name: "UseWatermark",
-            meta: {
-              title: "useWatermark"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    path: "/link",
-    meta: {
-      title: "文档链接",
-      elIcon: "Link"
-    },
-    children: [
-      {
-        path: "https://juejin.cn/post/7445151895121543209",
-        component: () => {},
-        name: "Link1",
-        meta: {
-          title: "中文文档"
-        }
-      },
-      {
-        path: "https://juejin.cn/column/7207659644487139387",
-        component: () => {},
-        name: "Link2",
-        meta: {
-          title: "新手教程"
-        }
-      }
+      { path: "users", component: () => import("@/pages/data/table.vue"), name: "DataUsers", meta: { title: getDataTableTitle("users"), table: "users" } },
+      { path: "vendors", component: () => import("@/pages/data/table.vue"), name: "DataVendors", meta: { title: getDataTableTitle("vendors"), table: "vendors" } },
+      { path: "posts", component: () => import("@/pages/data/table.vue"), name: "DataPosts", meta: { title: getDataTableTitle("posts"), table: "posts" } },
+      { path: "orders", component: () => import("@/pages/data/table.vue"), name: "DataOrders", meta: { title: getDataTableTitle("orders"), table: "orders" } },
+      { path: "order_items", component: () => import("@/pages/data/table.vue"), name: "DataOrderItems", meta: { title: getDataTableTitle("order_items"), table: "order_items" } },
+      { path: "menu_items", component: () => import("@/pages/data/table.vue"), name: "DataMenuItems", meta: { title: getDataTableTitle("menu_items"), table: "menu_items" } },
+      { path: "agent_requests", component: () => import("@/pages/data/table.vue"), name: "DataAgentRequests", meta: { title: getDataTableTitle("agent_requests"), table: "agent_requests" } },
+      { path: "audit_logs", component: () => import("@/pages/data/table.vue"), name: "DataAuditLogs", meta: { title: getDataTableTitle("audit_logs"), table: "audit_logs" } },
+      { path: "call_events", component: () => import("@/pages/data/table.vue"), name: "DataCallEvents", meta: { title: getDataTableTitle("call_events"), table: "call_events" } },
+      { path: "nutrition_logs", component: () => import("@/pages/data/table.vue"), name: "DataNutritionLogs", meta: { title: getDataTableTitle("nutrition_logs"), table: "nutrition_logs" } },
+      { path: "queue_entries", component: () => import("@/pages/data/table.vue"), name: "DataQueueEntries", meta: { title: getDataTableTitle("queue_entries"), table: "queue_entries" } },
+      { path: "retained_samples", component: () => import("@/pages/data/table.vue"), name: "DataRetainedSamples", meta: { title: getDataTableTitle("retained_samples"), table: "retained_samples" } },
+      { path: "sensor_logs", component: () => import("@/pages/data/table.vue"), name: "DataSensorLogs", meta: { title: getDataTableTitle("sensor_logs"), table: "sensor_logs" } },
+      { path: "stock_movements", component: () => import("@/pages/data/table.vue"), name: "DataStockMovements", meta: { title: getDataTableTitle("stock_movements"), table: "stock_movements" } },
+      { path: "test_reports", component: () => import("@/pages/data/table.vue"), name: "DataTestReports", meta: { title: getDataTableTitle("test_reports"), table: "test_reports" } }
     ]
   }
 ]
 
-/**
- * @name 动态路由
- * @description 用来放置有权限 (Roles 属性) 的路由
- * @description 必须带有唯一的 Name 属性
- */
-export const dynamicRoutes: RouteRecordRaw[] = [
-  {
-    path: "/permission",
-    component: Layouts,
-    redirect: "/permission/page-level",
-    name: "Permission",
-    meta: {
-      title: "权限演示",
-      elIcon: "Lock",
-      // 可以在根路由中设置角色
-      roles: ["admin", "editor"],
-      alwaysShow: true
-    },
-    children: [
-      {
-        path: "page-level",
-        component: () => import("@/pages/demo/permission/page-level.vue"),
-        name: "PermissionPageLevel",
-        meta: {
-          title: "页面级",
-          // 或者在子路由中设置角色
-          roles: ["admin"]
-        }
-      },
-      {
-        path: "button-level",
-        component: () => import("@/pages/demo/permission/button-level.vue"),
-        name: "PermissionButtonLevel",
-        meta: {
-          title: "按钮级",
-          // 如果未设置角色，则表示：该页面不需要权限，但会继承根路由的角色
-          roles: undefined
-        }
-      }
-    ]
-  }
-]
+/** 动态路由（当前未使用，仅保留结构） */
+export const dynamicRoutes: RouteRecordRaw[] = []
 
 /** 路由实例 */
 export const router = createRouter({

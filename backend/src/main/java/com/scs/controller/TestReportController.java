@@ -28,7 +28,7 @@ public class TestReportController {
 
     @GetMapping("/vendor/{vendorId}")
     public List<TestReport> listByVendor(@PathVariable Long vendorId) {
-        return repo.findByVendorIdOrderByTestedAtDesc(vendorId);
+        return repo.findByVendor_IdOrderByTestedAtDesc(vendorId);
     }
 
     @GetMapping("/{id}")

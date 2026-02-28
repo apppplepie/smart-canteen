@@ -28,7 +28,7 @@ public class StockMovementController {
 
     @GetMapping("/vendor/{vendorId}")
     public List<StockMovement> listByVendor(@PathVariable Long vendorId) {
-        return repo.findByVendorIdOrderByCreatedAtDesc(vendorId);
+        return repo.findByVendor_IdOrderByCreatedAtDesc(vendorId);
     }
 
     @GetMapping("/{id}")

@@ -31,12 +31,12 @@ public class OrderController {
 
     @GetMapping("/user/{userId}")
     public List<Order> listByUser(@PathVariable Long userId) {
-        return repo.findByUserIdOrderByPlacedAtDesc(userId);
+        return repo.findByUser_IdOrderByPlacedAtDesc(userId);
     }
 
     @GetMapping("/vendor/{vendorId}")
     public List<Order> listByVendor(@PathVariable Long vendorId) {
-        return repo.findByVendorIdOrderByPlacedAtDesc(vendorId);
+        return repo.findByVendor_IdOrderByPlacedAtDesc(vendorId);
     }
 
     @GetMapping("/{id}")
