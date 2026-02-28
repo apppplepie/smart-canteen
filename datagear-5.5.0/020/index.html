@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title></title>
+<link rel="stylesheet" href="css/style.css">
+<script type="text/javascript" src="script/common.js"></script>
+</head>
+<body dg-chart-auto-resize="true"
+	dg-chart-options="{title:{show:false},legend:{top:0},grid:{top:25}}"
+	dg-chart-theme="{'color':'#00f6ff','actualBackgroundColor':'#0b122e','graphColors':['#3fb1e3','#6be6c1','#ffb300','#a0a7e6','#c4ebad','#96dee8'],'graphRangeColors':['#0088ff','#289ec9','#00ddff']}">
+<div id="currentDateTime"></div>
+<div class="main">
+	<div class="head">
+		<div class="title">DataGear看板</div>
+	</div>
+	<div class="content">
+		<div class="content-left">
+			<div class="panel panel-top">
+				<div class="p-content">
+					<div class="chart" dg-chart-widget=""></div>
+				</div>
+			</div>
+			<div class="panel panel-center">
+				<div class="p-title"><img src="images/icon-01.png">标题</div>
+				<div class="p-content">
+					<div class="chart" dg-chart-widget=""></div>
+				</div>
+			</div>
+			<div class="panel panel-bottom">
+				<div class="p-title"><img src="images/icon-02.png">标题</div>
+				<div class="p-content">
+					<div class="chart" dg-chart-widget=""></div>
+				</div>
+			</div>
+		</div>
+		<div class="content-center">
+			<div class="panel panel-top">
+				<div class="p-title"><img src="images/icon-03.png">标题</div>
+				<div class="p-content">
+					<div class="chart" dg-chart-options="{legend:null}" dg-chart-widget=""></div>
+				</div>
+			</div>
+			<div class="panel panel-bottom">
+				<div class="p-title"><img src="images/icon-04.png">标题</div>
+				<div class="p-content">
+					<div class="chart" dg-chart-widget=""></div>
+				</div>
+			</div>
+		</div>
+		<div class="content-right">
+			<div class="panel panel-top">
+				<div class="p-content">
+					<div class="chart" dg-chart-widget=""></div>
+				</div>
+			</div>
+			<div class="panel panel-center">
+				<div class="p-title"><img src="images/icon-05.png">标题</div>
+				<div class="p-content">
+					<div class="chart" dg-chart-widget=""></div>
+				</div>
+			</div>
+			<div class="panel panel-bottom">
+				<div class="p-title"><img src="images/icon-06.png">标题</div>
+				<div class="p-content">
+					<div class="chart" dg-chart-widget=""></div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+currentDateTime("currentDateTime");
+</script>
+</body>
+</html>
