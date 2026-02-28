@@ -35,13 +35,11 @@ export default defineConfig(({ mode }) => {
       strictPort: false,
       // 是否自动打开浏览器
       open: true,
-      // 反向代理
+      // 反向代理：接口请求转发到 scs 后端
       proxy: {
-        "/api/v1": {
-          target: "https://apifoxmock.com/m1/2930465-2145633-default",
-          // 是否为 WebSocket
+        "/api": {
+          target: "http://localhost:8081",
           ws: false,
-          // 是否允许跨域
           changeOrigin: true
         }
       },
