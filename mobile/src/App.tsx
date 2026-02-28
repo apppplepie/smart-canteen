@@ -1,0 +1,110 @@
+import React, { useState } from "react";
+import { Home, Compass, User, Sparkles } from "lucide-react";
+import { OrderingTab } from "./components/OrderingTab";
+import { DynamicsTab } from "./components/DynamicsTab";
+import { ProfileTab } from "./components/ProfileTab";
+import { AIAssistantTab } from "./components/AIAssistantTab";
+import { cn } from "./lib/utils";
+import { AnimatePresence, motion } from "motion/react";
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState("ordering");
+
+  const tabs = [
+    { id: "ordering", label: "点餐", icon: Home },
+    { id: "dynamics", label: "动态", icon: Compass },
+    { id: "assistant", label: "AI助手", icon: Sparkles },
+    { id: "profile", label: "我的", icon: User },
+  ];
+
+  return (
+    <div className="flex flex-col md:flex-row h-screen w-full bg-gray-50 relative overflow-hidden">
+      {/* Sidebar Navigation (Desktop) */}
+      <div className="hidden md:flex flex-col w-64 bg-white border-r border-gray-100 p-6 z-20 shadow-sm">
+        <div className="text-2xl font-bold text-gray-900 mb-12 px-4 flex items-center gap-2">
+          <div className="w-8 h-8 bg-[#FF6B6B] rounded-xl flex items-center justify-center">
+            <Sparkles className="text-white" size={18} />
+          </div>
+          智慧食堂
+        </div>
+        <div className="flex flex-col gap-2">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200",
+                  isActive
+                    ? "bg-red-50 text-[#FF6B6B] font-bold"
+                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 font-medium"
+                )}
+              >
+                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                <span className="text-[15px]">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto no-scrollbar relative flex flex-col">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="flex-1 h-full"
+          >
+            {activeTab === "ordering" && <OrderingTab />}
+            {activeTab === "dynamics" && <DynamicsTab />}
+            {activeTab === "assistant" && <AIAssistantTab />}
+            {activeTab === "profile" && <ProfileTab onNavigate={setActiveTab} />}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Bottom Navigation (Mobile) */}
+      <div className="md:hidden bg-white border-t border-gray-100 px-6 py-3 flex justify-between items-center pb-safe z-20">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex flex-col items-center justify-center w-16 gap-1 transition-colors duration-200",
+                isActive
+                  ? "text-[#FF6B6B]"
+                  : "text-gray-400 hover:text-gray-600",
+              )}
+            >
+              <div
+                className={cn(
+                  "p-2 rounded-2xl transition-all duration-300",
+                  isActive ? "bg-red-50 scale-110" : "bg-transparent scale-100",
+                )}
+              >
+                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+              </div>
+              <span
+                className={cn(
+                  "text-[10px] font-medium transition-all duration-300",
+                  isActive ? "opacity-100" : "opacity-70",
+                )}
+              >
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
