@@ -54,11 +54,11 @@ export const constantRoutes: RouteRecordRaw[] = [
     children: [
       {
         path: "",
-        component: () => import("@/pages/dashboard/index.vue"),
+        component: () => import("@/pages/chat/index.vue"),
         name: "Dashboard",
         meta: {
-          title: "首页",
-          svgIcon: "dashboard",
+          title: "AI 助手",
+          elIcon: "ChatDotRound",
           affix: true
         }
       }

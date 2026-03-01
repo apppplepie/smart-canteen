@@ -15,10 +15,14 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
-import { GoogleGenAI } from "@google/genai";
 import { THEME } from "../config/theme";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
+
+function getApiKey(): string | null {
+  const key = process.env.DEEPSEEK_API_KEY;
+  return key && key !== "" ? key : null;
+}
 
 interface Message {
   id: string;
@@ -98,36 +102,61 @@ export function AIAssistantTab() {
     setInput("");
     setIsLoading(true);
 
-    try {
-      // Build conversation history for context
-      const history = messages
-        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-        .join("\n");
-      const prompt = `
-        你是一个大学食堂的智能点餐助手。你的语气应该活泼、友好、像个懂吃的朋友。
-        食堂目前有以下档口：
-        1. 川香麻辣烫（排队较长，口味重，人均18元）
-        2. 健康轻食沙拉（出餐快，低脂，人均25元）
-        3. 老北京炸酱面（排队中等，碳水满足，人均15元）
-        4. 日式咖喱屋（出餐较快，口味浓郁，人均20元）
-        
-        用户历史对话：
-        ${history}
-        
-        用户最新问题：${text}
-        
-        请给出简短、有建设性的建议。如果用户赶时间，推荐出餐快的。如果用户不知道吃什么，可以随机推荐并给出理由。
-      `;
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "请先在 mobile 目录下配置 .env 中的 DEEPSEEK_API_KEY 后重启开发服务器，AI 助手即可使用。",
+        },
+      ]);
+      setIsLoading(false);
+      return;
+    }
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
+    try {
+      const history = messages.map((m) => ({
+        role: m.role === "user" ? "user" as const : "assistant" as const,
+        content: m.content,
+      }));
+      const systemPrompt = `你是一个大学食堂的智能点餐助手。你的语气应该活泼、友好、像个懂吃的朋友。
+食堂目前有以下档口：
+1. 川香麻辣烫（排队较长，口味重，人均18元）
+2. 健康轻食沙拉（出餐快，低脂，人均25元）
+3. 老北京炸酱面（排队中等，碳水满足，人均15元）
+4. 日式咖喱屋（出餐较快，口味浓郁，人均20元）
+请给出简短、有建设性的建议。如果用户赶时间，推荐出餐快的。如果用户不知道吃什么，可以随机推荐并给出理由。`;
+
+      const res = await fetch(DEEPSEEK_API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...history,
+            { role: "user", content: text },
+          ],
+        }),
       });
+
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
 
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: response.text || "抱歉，我刚才走神了，能再说一遍吗？",
+        content: content || "抱歉，我刚才走神了，能再说一遍吗？",
       };
 
       setMessages((prev) => [...prev, aiMsg]);

@@ -110,9 +110,9 @@ public class V1DataController {
     public ApiResult<Object> get(@PathVariable String table, @PathVariable Long id) {
         JpaRepository<?, Long> repo = repoMap.get(table);
         if (repo == null) return ApiResult.fail(404, "表不存在: " + table);
-        return repo.findById(id)
-                .map(ApiResult::ok)
-                .orElseGet(() -> ApiResult.<Object>fail(404, "记录不存在"));
+        var opt = repo.findById(id);
+        if (opt.isEmpty()) return ApiResult.fail(404, "记录不存在");
+        return ApiResult.<Object>ok(opt.get());
     }
 
     @SuppressWarnings("unchecked")

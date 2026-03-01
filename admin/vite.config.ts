@@ -41,6 +41,15 @@ export default defineConfig(({ mode }) => {
           target: "http://localhost:8081",
           ws: false,
           changeOrigin: true
+        },
+        "/deepseek": {
+          target: "https://api.deepseek.com",
+          ws: false,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/deepseek/, ""),
+          headers: {
+            Authorization: `Bearer ${loadEnv(mode, process.cwd(), "").DEEPSEEK_API_KEY}`
+          }
         }
       },
       // 是否允许跨域

@@ -1,10 +1,10 @@
 import type { RouteLocationNormalizedGeneric, RouteRecordNameGeneric } from "vue-router"
 
 /** 免登录白名单（匹配路由 path） */
-const whiteListByPath: string[] = ["/login"]
+const whiteListByPath: string[] = ["/login", "/dashboard", "/"]
 
 /** 免登录白名单（匹配路由 name） */
-const whiteListByName: RouteRecordNameGeneric[] = []
+const whiteListByName: RouteRecordNameGeneric[] = ["Dashboard"]
 
 /** 判断是否在白名单 */
 export function isWhiteList(to: RouteLocationNormalizedGeneric) {
