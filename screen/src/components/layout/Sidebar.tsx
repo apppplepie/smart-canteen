@@ -1,22 +1,6 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  Store, 
-  BookOpen, 
-  ShieldCheck, 
-  Search, 
-  MessageSquare 
-} from 'lucide-react';
 import { NavItem } from '../common/NavItem';
-
-const sidebarItems = [
-  { path: '/', icon: LayoutDashboard, label: '平台首页' },
-  { path: '/cafeteria', icon: Store, label: '食堂风采' },
-  { path: '/menu', icon: BookOpen, label: '菜单查看' },
-  { path: '/food-safety', icon: ShieldCheck, label: '食安公示' },
-  { path: '/lost-found', icon: Search, label: '寻物平台' },
-  { path: '/feedback', icon: MessageSquare, label: '留言建议' },
-];
+import { navItems } from '../../mocks/nav';
 
 export function Sidebar() {
   return (
@@ -26,7 +10,7 @@ export function Sidebar() {
           业务模块
         </div>
         <nav>
-          {sidebarItems.map((item) => (
+          {navItems.map((item) => (
             <NavItem
               key={item.path}
               to={item.path}

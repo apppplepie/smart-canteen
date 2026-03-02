@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Send, Sparkles, Loader2 } from 'lucide-react';
 
+import { aiAssistantMenuContext, aiAssistantInitialMessage } from '../../mocks/aiAssistant';
+
 const DEEPSEEK_API = 'https://api.deepseek.com/v1/chat/completions';
 
 function getApiKey(): string | null {
@@ -9,27 +11,10 @@ function getApiKey(): string | null {
   return key && key !== '' ? key : null;
 }
 
-// Mock menu data to provide context to the AI
-const menuContext = `
-今日菜单推荐上下文：
-一食堂：
-- 招牌红烧肉 (18元, 推荐指数 4.8)
-- 清炒时蔬 (8元, 推荐指数 4.5)
-- 糖醋排骨 (16元, 推荐指数 4.7)
-二食堂：
-- 脆皮烤鸭 (22元, 推荐指数 4.9)
-- 麻婆豆腐 (10元, 推荐指数 4.6)
-- 番茄炒蛋 (9元, 推荐指数 4.5)
-特色小吃：
-- 兰州拉面 (12元)
-- 重庆小面 (10元)
-- 煎饼果子 (8元)
-`;
-
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
-    { role: 'ai', text: '你好！我是你的专属食堂AI助手。想知道今天有什么好吃的吗？' }
+    aiAssistantInitialMessage,
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -66,7 +51,7 @@ export function AIAssistant() {
       const systemPrompt = `你是一个大学食堂的AI助手，负责给学生推荐菜品、回答关于食堂的问题。请保持热情、友好、活泼的语气。
 
 以下是今日的菜单信息：
-${menuContext}
+${aiAssistantMenuContext}
 
 请根据以上信息给出回答。如果学生问的问题与食堂无关，请委婉地引导回食堂的话题。`;
 

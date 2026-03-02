@@ -8,42 +8,9 @@ import {
 } from 'lucide-react';
 import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, 
-  Legend, CartesianGrid, ReferenceArea, Brush, Area, AreaChart
+  CartesianGrid, ReferenceArea, Brush, Area, AreaChart
 } from 'recharts';
-
-// --- Mock Data ---
-const generateTempData = () => {
-  const data = [];
-  for (let i = 0; i < 24; i++) {
-    const hour = i.toString().padStart(2, '0') + ':00';
-    // Temp around 4-6, sometimes spikes
-    const temp = 4 + Math.random() * 3 + (i === 12 ? 3 : 0); 
-    // PPM around 160-190
-    const ppm = 160 + Math.random() * 30 - (i === 14 ? 40 : 0);
-    data.push({ time: hour, temp: Number(temp.toFixed(1)), ppm: Number(ppm.toFixed(0)) });
-  }
-  return data;
-};
-const tempData = generateTempData();
-
-const reports = [
-  { id: 1, type: '农药残留检测', result: 'PASS', agency: '市食品安全检测中心', time: '今日 08:30', icon: <Activity className="w-6 h-6 text-emerald-400" /> },
-  { id: 2, type: '重金属含量检测', result: 'PASS', agency: '第三方权威机构', time: '今日 09:15', icon: <ShieldCheck className="w-6 h-6 text-blue-400" /> },
-  { id: 3, type: '表面细菌培养', result: 'PASS', agency: '校内自检实验室', time: '今日 10:00', icon: <Droplets className="w-6 h-6 text-cyan-400" /> },
-];
-
-const samples = [
-  { id: 'S-20260226-01', meal: '早餐', time: '07:30', loc: 'A区冷藏柜', status: '冷藏中 (48h)', operator: '张师傅' },
-  { id: 'S-20260226-02', meal: '午餐', time: '11:30', loc: 'B区冷藏柜', status: '冷藏中 (48h)', operator: '李阿姨' },
-  { id: 'S-20260226-03', meal: '晚餐', time: '17:30', loc: 'A区冷藏柜', status: '待入库', operator: '王师傅' },
-  { id: 'S-20260224-01', meal: '前日早餐', time: '07:30', loc: 'C区冷藏柜', status: '已销毁', operator: '赵主管' },
-];
-
-const allergens = [
-  { window: '一食堂 1号窗 (面食)', tags: [{ name: '麸质', icon: Wheat, color: 'text-amber-400 bg-amber-500/20 border-amber-500/30' }] },
-  { window: '一食堂 3号窗 (轻食)', tags: [{ name: '海鲜', icon: Fish, color: 'text-blue-400 bg-blue-500/20 border-blue-500/30' }, { name: '坚果', icon: Info, color: 'text-orange-400 bg-orange-500/20 border-orange-500/30' }] },
-  { window: '二食堂 5号窗 (甜品)', tags: [{ name: '乳制品', icon: Coffee, color: 'text-rose-400 bg-rose-500/20 border-rose-500/30' }] },
-];
+import { tempData, foodSafetyReports, foodSafetySamples, foodSafetyAllergens } from '../mocks/foodSafety';
 
 // --- Custom Tooltip ---
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -167,7 +134,7 @@ const TrustGauge = () => {
 const ReportCards = () => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full pt-12">
-      {reports.map((report, idx) => (
+      {foodSafetyReports.map((report, idx) => (
         <motion.div
           key={idx}
           initial={{ opacity: 0, y: 20 }}
@@ -349,7 +316,7 @@ export default function FoodSafety() {
               <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-900/80 to-transparent z-10 pointer-events-none" />
               
               <div className="animate-scroll-y flex flex-col gap-3 pt-2">
-                {[...samples, ...samples].map((sample, idx) => (
+                {[...foodSafetySamples, ...foodSafetySamples].map((sample, idx) => (
                   <div key={idx} className="bg-black/20 border border-white/5 rounded-2xl p-4 hover:bg-white/5 transition-colors cursor-pointer group">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
@@ -395,7 +362,7 @@ export default function FoodSafety() {
               <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-900/80 to-transparent z-10 pointer-events-none" />
               
               <div className="animate-scroll-y flex flex-col gap-4 pt-2">
-                {[...allergens, ...allergens].map((item, idx) => (
+                {[...foodSafetyAllergens, ...foodSafetyAllergens].map((item, idx) => (
                   <div key={idx} className="bg-black/20 border border-white/5 rounded-2xl p-5">
                     <h3 className="text-white font-bold mb-3 flex items-center gap-2">
                       <Store className="w-4 h-4 text-slate-400" />

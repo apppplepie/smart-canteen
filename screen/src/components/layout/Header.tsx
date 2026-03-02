@@ -1,26 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { 
-  UtensilsCrossed, 
-  LayoutDashboard, 
-  Store, 
-  BookOpen, 
-  ShieldCheck, 
-  Search, 
-  MessageSquare,
-  Sun,
-  Moon
-} from 'lucide-react';
+import { UtensilsCrossed, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-const headerNavItems = [
-  { path: '/', icon: LayoutDashboard, label: '平台首页' },
-  { path: '/cafeteria', icon: Store, label: '食堂风采' },
-  { path: '/menu', icon: BookOpen, label: '菜单查看' },
-  { path: '/food-safety', icon: ShieldCheck, label: '食安公示' },
-  { path: '/lost-found', icon: Search, label: '寻物平台' },
-  { path: '/feedback', icon: MessageSquare, label: '留言建议' },
-];
+import { navItems } from '../../mocks/nav';
 
 export function Header() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -73,7 +55,7 @@ export function Header() {
       <nav className="flex-1 flex justify-center">
         {/* Fixed width container to prevent layout shifts when items expand/collapse */}
         <div className="flex items-center space-x-2 bg-black/20 p-1.5 rounded-2xl border border-white/5 w-[580px] justify-between shadow-inner">
-          {headerNavItems.map((item) => {
+          {navItems.map((item) => {
             const isActive = item.path === '/' 
               ? location.pathname === '/'
               : location.pathname.startsWith(item.path);

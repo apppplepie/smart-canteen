@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { PageContainer } from '../components/common/PageContainer';
 import { motion, AnimatePresence } from 'motion/react';
-import { Coffee, Sun, Moon, Utensils, Clock, MapPin } from 'lucide-react';
+import { Clock, MapPin } from 'lucide-react';
+import { cafeteriaBentoItems, cafeteriaMeals } from '../mocks/cafeteria';
 
 // --- Subcomponents ---
 
@@ -35,43 +36,9 @@ const MiniCarousel = ({ images }: { images: string[] }) => {
 };
 
 const BentoGrid = () => {
-  const items = [
-    { 
-      title: "VIP 包间", 
-      desc: "私密静谧，商务洽谈首选", 
-      images: [
-        "https://picsum.photos/seed/vip1/800/600", 
-        "https://picsum.photos/seed/vip2/800/600", 
-        "https://picsum.photos/seed/vip3/800/600"
-      ], 
-      colSpan: "md:col-span-2", 
-      rowSpan: "md:row-span-2" 
-    },
-    { 
-      title: "休闲水吧", 
-      desc: "鲜榨果汁与手冲咖啡", 
-      images: [
-        "https://picsum.photos/seed/bar1/400/400", 
-        "https://picsum.photos/seed/bar2/400/400"
-      ], 
-      colSpan: "md:col-span-1", 
-      rowSpan: "md:row-span-1" 
-    },
-    { 
-      title: "户外露台", 
-      desc: "阳光与微风的完美结合", 
-      images: [
-        "https://picsum.photos/seed/out1/400/400", 
-        "https://picsum.photos/seed/out2/400/400"
-      ], 
-      colSpan: "md:col-span-1", 
-      rowSpan: "md:row-span-1" 
-    },
-  ];
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full min-h-[500px]">
-      {items.map((item, idx) => (
+      {cafeteriaBentoItems.map((item, idx) => (
         <motion.div
           key={idx}
           initial={{ opacity: 0, scale: 0.95 }}
@@ -125,13 +92,6 @@ const MealTimeCard = ({ meal, index }: { meal: any, index: number, key?: React.K
 // --- Main Page Component ---
 
 export default function Cafeteria() {
-  const meals = [
-    { name: '晨光早餐', time: '06:30 - 09:00', icon: Coffee, color: 'from-amber-500 to-orange-600' },
-    { name: '能量午餐', time: '11:00 - 13:30', icon: Sun, color: 'from-cyan-500 to-blue-600' },
-    { name: '温馨晚餐', time: '17:00 - 19:30', icon: Moon, color: 'from-indigo-500 to-purple-600' },
-    { name: '深夜食堂', time: '21:00 - 23:00', icon: Utensils, color: 'from-rose-500 to-pink-600' }
-  ];
-
   return (
     <PageContainer>
       {/* Dark Tech Theme Wrapper - Fit to screen height */}
@@ -149,7 +109,7 @@ export default function Cafeteria() {
         {/* Bottom Section: Meal Times (Fixed height based on content) */}
         <div className="shrink-0 relative z-10">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 h-[120px] md:h-[140px]">
-            {meals.map((meal, idx) => (
+            {cafeteriaMeals.map((meal, idx) => (
               <MealTimeCard key={idx} meal={meal} index={idx} />
             ))}
           </div>
