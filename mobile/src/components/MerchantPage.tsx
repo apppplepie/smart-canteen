@@ -48,6 +48,7 @@ export function MerchantPage({ merchant, onBack, user }: MerchantPageProps) {
     const base = getBaseUrl();
     if (!base || !merchant?.id) {
       setMenuLoading(false);
+      setMenu(FALLBACK_MENU);
       return;
     }
     let cancelled = false;
@@ -55,16 +56,23 @@ export function MerchantPage({ merchant, onBack, user }: MerchantPageProps) {
       try {
         const list = await listMenuItemsByVendor(merchant.id);
         if (cancelled) return;
+        const baseNorm = base.replace(/\/$/, "");
         const mapped: MenuItemRow[] = list
           .filter((m) => m.isAvailable !== false)
-          .map((m) => ({
-            id: m.id,
-            name: m.name,
-            price: Number(m.price),
-            desc: m.description ?? "",
-            image: `https://picsum.photos/seed/d${m.id}/200/200`,
-            popular: false,
-          }));
+          .map((m) => {
+            const image =
+              m.imageUrl
+                ? baseNorm + (m.imageUrl.startsWith("/") ? m.imageUrl : "/" + m.imageUrl)
+                : `https://picsum.photos/seed/d${m.id}/200/200`;
+            return {
+              id: m.id,
+              name: m.name,
+              price: Number(m.price),
+              desc: m.description ?? "",
+              image,
+              popular: false,
+            };
+          });
         setMenu(mapped.length ? mapped : FALLBACK_MENU);
       } catch {
         if (!cancelled) setMenu(FALLBACK_MENU);
@@ -104,7 +112,7 @@ export function MerchantPage({ merchant, onBack, user }: MerchantPageProps) {
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 50 }}
-      className="absolute inset-0 bg-white z-50 flex flex-col"
+      className="fixed inset-0 bg-white z-50 flex flex-col"
     >
       {/* Header Image & Info */}
       <div className="relative h-64 md:h-80 shrink-0 w-full">

@@ -140,7 +140,7 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 50 }}
-            className="absolute inset-0 bg-white z-[60] flex flex-col"
+            className="fixed inset-0 bg-white z-[60] flex flex-col"
             key="post-detail"
           >
             <div className="flex items-center px-4 pt-6 pb-3 border-b border-gray-100 sticky top-0 bg-white z-10">

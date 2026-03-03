@@ -16,9 +16,9 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@scs/api": ["../shared/api"],
+      "@scs/api/*": ["../shared/api/*"]
     },
     "allowImportingTsExtensions": true,
     "noEmit": true

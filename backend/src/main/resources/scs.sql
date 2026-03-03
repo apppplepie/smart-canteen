@@ -16,7 +16,7 @@ CREATE TABLE users (
   is_deleted TINYINT(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Vendors / Windows
+-- Vendors / Windows (image_url 存 /api/images/xxx.jpg，由后端静态目录提供)
 DROP TABLE IF EXISTS vendors;
 CREATE TABLE vendors (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -24,12 +24,13 @@ CREATE TABLE vendors (
   description TEXT,
   location_label VARCHAR(64),
   contact_info VARCHAR(256),
+  image_url VARCHAR(512) DEFAULT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   is_active TINYINT(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Menu items
+-- Menu items (image_url: 菜品主图/封面，若需多图可另建 menu_item_images 表)
 DROP TABLE IF EXISTS menu_items;
 CREATE TABLE menu_items (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -42,6 +43,7 @@ CREATE TABLE menu_items (
   protein FLOAT NULL,
   fat FLOAT NULL,
   carbs FLOAT NULL,
+  image_url VARCHAR(512) DEFAULT NULL,
   is_available TINYINT(1) DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -234,19 +236,19 @@ INSERT INTO users (username, display_name, email, phone, role) VALUES
 ('vendor01','Vendor 01','vendor01@example.com','+10000000010','vendor');
 
 -- Vendors
-INSERT INTO vendors (name, description, location_label, contact_info) VALUES
-('香辣小炒','川味快餐','窗口 01','+10000000011'),
-('面馆阿强','手工面食','窗口 02','+10000000012'),
-('蒸菜坊','健康蒸菜','窗口 03','+10000000013');
+INSERT INTO vendors (name, description, location_label, contact_info, image_url) VALUES
+('香辣小炒','川味快餐','窗口 01','+10000000011',NULL),
+('面馆阿强','手工面食','窗口 02','+10000000012',NULL),
+('蒸菜坊','健康蒸菜','窗口 03','+10000000013',NULL);
 
 -- Menu items
-INSERT INTO menu_items (vendor_id, name, description, price, prep_time_seconds, calories) VALUES
-(1,'香辣土豆丝','微辣，配米饭',12.00,180,320),
-(1,'回锅肉','经典回锅肉',18.00,300,520),
-(2,'卤肉面','卤汁浓郁',14.00,240,450),
-(2,'牛肉面','大块牛肉',22.00,360,680),
-(3,'清蒸鱼','低油清淡',28.00,420,300),
-(3,'蒸蔬菜拼盘','时令蔬菜',10.00,120,150);
+INSERT INTO menu_items (vendor_id, name, description, price, prep_time_seconds, calories, image_url) VALUES
+(1,'香辣土豆丝','微辣，配米饭',12.00,180,320,NULL),
+(1,'回锅肉','经典回锅肉',18.00,300,520,NULL),
+(2,'卤肉面','卤汁浓郁',14.00,240,450,NULL),
+(2,'牛肉面','大块牛肉',22.00,360,680,NULL),
+(3,'清蒸鱼','低油清淡',28.00,420,300,NULL),
+(3,'蒸蔬菜拼盘','时令蔬菜',10.00,120,150,NULL);
 
 -- Orders and order items
 INSERT INTO orders (user_id, vendor_id, total_amount, status, queue_number) VALUES

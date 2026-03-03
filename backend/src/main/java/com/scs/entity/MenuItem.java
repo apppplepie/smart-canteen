@@ -40,6 +40,9 @@ public class MenuItem {
     private Float fat;
     private Float carbs;
 
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
+
     @Column(name = "is_available", nullable = false)
     private Boolean isAvailable = true;
 
@@ -80,6 +83,8 @@ public class MenuItem {
     public void setFat(Float fat) { this.fat = fat; }
     public Float getCarbs() { return carbs; }
     public void setCarbs(Float carbs) { this.carbs = carbs; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public Boolean getIsAvailable() { return isAvailable; }
     public void setIsAvailable(Boolean isAvailable) { this.isAvailable = isAvailable; }
     public LocalDateTime getCreatedAt() { return createdAt; }

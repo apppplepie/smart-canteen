@@ -2,7 +2,7 @@
  * 将后端 DTO 转成前端页面使用的结构
  */
 import type { Dish } from '../components/menu/DishCardModal';
-import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto } from './types';
+import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto } from '@scs/api';
 
 const defaultImage = (id: number) => `https://picsum.photos/seed/dish${id}/600/800`;
 

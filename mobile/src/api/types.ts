@@ -1,60 +1,8 @@
-// Backend entity shapes (match Java entities / JSON)
-
-export interface Post {
-  id: number;
-  userId?: number;
-  vendorId?: number;
-  title?: string;
-  content: string;
-  mediaUrls?: string; // JSON string, e.g. '["url1","url2"]'
-  likeCount: number;
-  commentCount: number;
-  createdAt: string; // ISO datetime
-}
-
-export interface Vendor {
-  id: number;
-  name: string;
-  description?: string;
-  locationLabel?: string;
-  contactInfo?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  isActive: boolean;
-}
-
-export interface MenuItem {
-  id: number;
-  vendorId: number;
-  name: string;
-  description?: string;
-  price: number;
-  prepTimeSeconds?: number;
-  calories?: number;
-  protein?: number;
-  fat?: number;
-  carbs?: number;
-  isAvailable: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface Order {
-  id: number;
-  userId?: number;
-  vendorId?: number;
-  totalAmount: number;
-  status: string;
-  queueNumber?: string;
-  placedAt: string;
-  updatedAt?: string;
-}
-
-export interface OrderItem {
-  id: number;
-  orderId?: number;
-  menuItemId?: number;
-  quantity: number;
-  priceEach: number;
-  createdAt?: string;
-}
+/** Re-export shared DTOs 为 mobile 使用的类型名（无 Dto 后缀） */
+export type {
+  PostDto as Post,
+  VendorDto as Vendor,
+  MenuItemDto as MenuItem,
+  OrderDto as Order,
+  OrderItemDto as OrderItem,
+} from "@scs/api";

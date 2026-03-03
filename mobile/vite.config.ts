@@ -13,6 +13,7 @@ export default defineConfig(({mode}) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        '@scs/api': path.resolve(__dirname, '../shared/api'),
       },
     },
     server: {

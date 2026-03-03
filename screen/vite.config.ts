@@ -9,10 +9,12 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.DEEPSEEK_API_KEY': JSON.stringify(env.DEEPSEEK_API_KEY),
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL ?? ''),
     },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        '@scs/api': path.resolve(__dirname, '../shared/api'),
       },
     },
     server: {

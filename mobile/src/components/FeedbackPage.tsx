@@ -81,7 +81,7 @@ export function FeedbackPage({ onBack }: { onBack: () => void }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="absolute inset-0 bg-white z-20 flex flex-col"
+              className="fixed inset-0 bg-white z-20 flex flex-col"
             >
               <SharedPostDetail post={{...selectedPost, tags: ["问题反馈", selectedPost.type]}}>
                 <div className="flex items-center justify-between mb-4 mt-4">

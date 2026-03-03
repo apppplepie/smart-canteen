@@ -83,7 +83,7 @@ export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu, userId 
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 50 }}
-      className="absolute inset-0 bg-gray-50 z-[60] flex flex-col"
+      className="fixed inset-0 bg-gray-50 z-[60] flex flex-col"
     >
       {/* Header */}
       <div 
@@ -248,7 +248,7 @@ export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu, userId 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/50 z-[70] flex flex-col justify-end"
+            className="fixed inset-0 bg-black/50 z-[70] flex flex-col justify-end"
             onClick={() => setShowAddressModal(false)}
           >
             <motion.div

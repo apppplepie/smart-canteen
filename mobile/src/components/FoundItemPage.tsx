@@ -80,7 +80,7 @@ export function FoundItemPage({ onBack }: { onBack: () => void }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="absolute inset-0 bg-white z-20 flex flex-col"
+              className="fixed inset-0 bg-white z-20 flex flex-col"
             >
               <SharedPostDetail post={{...selectedPost, tags: ["失物招领"]}}>
                 <div className="bg-gray-50 rounded-2xl p-4 space-y-3 mt-4">

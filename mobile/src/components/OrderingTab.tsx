@@ -19,6 +19,7 @@ type Merchant = {
   popular: boolean;
 };
 
+/** Mock 商家（API 连不上时回退），image 用 picsum 占位 */
 const FALLBACK_MERCHANTS: Merchant[] = [
   { id: 1, name: "川香麻辣烫", rating: 4.8, reviews: 1205, time: "10-15 min", distance: "1F 东区", tags: ["麻辣鲜香", "自选"], image: "https://picsum.photos/seed/m1/400/300", popular: true },
   { id: 2, name: "健康轻食沙拉", rating: 4.9, reviews: 890, time: "5-10 min", distance: "2F 西区", tags: ["低脂", "减脂餐"], image: "https://picsum.photos/seed/m2/400/300", popular: false },
@@ -43,17 +44,24 @@ export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
       try {
         const list = await listVendors();
         if (cancelled) return;
-        const mapped: Merchant[] = list.map((v) => ({
-          id: v.id,
-          name: v.name,
-          rating: 4.5,
-          reviews: 500,
-          time: "10-15 min",
-          distance: v.locationLabel ?? "食堂",
-          tags: v.description ? [v.description.slice(0, 6)] : ["美食"],
-          image: `https://picsum.photos/seed/m${v.id}/400/300`,
-          popular: v.id % 2 === 1,
-        }));
+        const base = getBaseUrl();
+        const mapped: Merchant[] = list.map((v) => {
+          const image =
+            v.imageUrl && base
+              ? base.replace(/\/$/, "") + (v.imageUrl.startsWith("/") ? v.imageUrl : "/" + v.imageUrl)
+              : `https://picsum.photos/seed/m${v.id}/400/300`;
+          return {
+            id: v.id,
+            name: v.name,
+            rating: 4.5,
+            reviews: 500,
+            time: "10-15 min",
+            distance: v.locationLabel ?? "食堂",
+            tags: v.description ? [v.description.slice(0, 6)] : ["美食"],
+            image,
+            popular: v.id % 2 === 1,
+          };
+        });
         setMerchants(mapped.length ? mapped : FALLBACK_MERCHANTS);
       } catch {
         if (!cancelled) setMerchants(FALLBACK_MERCHANTS);
