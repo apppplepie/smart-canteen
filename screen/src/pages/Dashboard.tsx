@@ -5,12 +5,14 @@ import {
   Store, Clock, Users, Flame, Sparkles, BellRing, 
   CheckCircle2, ArrowRight, Map, ChefHat, Utensils
 } from 'lucide-react';
-import { generateInitialWindows, statusConfig, initialJustServed, initialWaiting } from '../mocks/dashboard';
+import { useDashboard } from '../hooks/useBackendData';
 
 // --- Components ---
 
-const WindowCard: React.FC<{ window: any, isServing: boolean }> = ({ window, isServing }) => {
-  const config = statusConfig[window.status as keyof typeof statusConfig];
+type StatusConfig = Record<string, { text: string; color: string; bg: string; border: string; shadow: string }>;
+
+const WindowCard: React.FC<{ window: any; isServing: boolean; statusConfig: StatusConfig }> = ({ window, isServing, statusConfig }) => {
+  const config = statusConfig[window.status as keyof StatusConfig] ?? statusConfig.idle;
   
   return (
     <motion.div
@@ -166,8 +168,14 @@ const HeatmapGuide = ({ windows }: { windows: any[] }) => {
   );
 };
 
-const CallingArea = () => {
-  const [justServed, setJustServed] = useState<{id: string, win: string}[]>(initialJustServed);
+const CallingArea = ({
+  initialJustServed,
+  initialWaiting,
+}: {
+  initialJustServed: { id: string; win: string }[];
+  initialWaiting: string[];
+}) => {
+  const [justServed, setJustServed] = useState<{ id: string; win: string }[]>(initialJustServed);
   const [waiting, setWaiting] = useState<string[]>(initialWaiting);
 
   useEffect(() => {
@@ -256,13 +264,14 @@ const CallingArea = () => {
 };
 
 export default function Dashboard() {
-  const [windows, setWindows] = useState(() => generateInitialWindows());
+  const { windows, setWindows, statusConfig, initialJustServed, initialWaiting, isFromApi } = useDashboard();
   const [servingWindowId, setServingWindowId] = useState<string | null>(null);
 
-  // Simulate real-time updates and serving events
+  // 仅在使用 mock 数据时模拟排队人数变化
   useEffect(() => {
+    if (isFromApi) return;
     const timer = setInterval(() => {
-      setWindows(prev => {
+      setWindows((prev) => {
         const next = [...prev];
         // Pick multiple random windows to update to make the heatmap look alive
         for (let i = 0; i < 4; i++) {
@@ -291,9 +300,8 @@ export default function Dashboard() {
         return next;
       });
     }, 1500);
-    
     return () => clearInterval(timer);
-  }, []);
+  }, [isFromApi, setWindows]);
 
   return (
     <PageContainer>
@@ -345,6 +353,7 @@ export default function Dashboard() {
                     key={`${window.id}-${idx}`} 
                     window={window} 
                     isServing={servingWindowId === window.id}
+                    statusConfig={statusConfig}
                   />
                 ))}
               </div>
@@ -371,7 +380,7 @@ export default function Dashboard() {
             transition={{ delay: 0.1 }}
             className="lg:col-span-3 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 flex flex-col overflow-hidden"
           >
-            <CallingArea />
+            <CallingArea initialJustServed={initialJustServed} initialWaiting={initialWaiting} />
           </motion.div>
 
         </div>

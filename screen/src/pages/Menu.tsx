@@ -3,9 +3,10 @@ import { PageContainer } from '../components/common/PageContainer';
 import { motion } from 'motion/react';
 import { Search, MapPin, Store, Sparkles, Star } from 'lucide-react';
 import { DishCardModal, Dish } from '../components/menu/DishCardModal';
-import { menuCategories, mockDishes } from '../mocks/menu';
+import { useMenu } from '../hooks/useBackendData';
 
 export default function Menu() {
+  const { dishes: mockDishes, categories: menuCategories, loading } = useMenu();
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
   const [colCount, setColCount] = useState(4);
@@ -98,6 +99,11 @@ export default function Menu() {
 
           {/* Main Content - Pseudo Masonry Grid */}
           <div className="flex-1 overflow-hidden relative">
+            {loading && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+                <div className="text-cyan-400 font-medium">加载中...</div>
+              </div>
+            )}
             {/* Gradient masks for smooth fade */}
             <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-slate-950 to-transparent z-20 pointer-events-none" />
             <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-slate-950 to-transparent z-20 pointer-events-none" />

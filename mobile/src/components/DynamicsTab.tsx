@@ -7,7 +7,8 @@ import {
   Plus,
   MapPin,
   ChevronLeft,
-  Send
+  Send,
+  Star
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { FloatingActionButton } from "./FloatingActionButton";
@@ -15,6 +16,7 @@ import { PublishPage } from "./PublishPage";
 import { MerchantPage } from "./MerchantPage";
 import { THEME } from "../config/theme";
 import { cn } from "../lib/utils";
+import { SharedPostDetail } from "./SharedPostDetail";
 
 const POSTS = [
   {
@@ -77,6 +79,42 @@ const POSTS = [
     dishName: "抹茶毛巾卷",
     isLatest: false,
   },
+  {
+    id: 5,
+    user: { name: "热心同学", avatar: "https://picsum.photos/seed/u5/100/100" },
+    content: "【寻物启事】昨天中午在一楼食堂丢了一把黑色的雨伞，伞柄有划痕。有捡到的同学麻烦联系我，必有重谢！",
+    image: "https://picsum.photos/seed/umbrella/400/300",
+    likes: 12,
+    comments: 3,
+    time: "2小时前",
+    height: "h-48",
+    isLatest: true,
+    tags: ["寻物启事", "一楼东区"]
+  },
+  {
+    id: 6,
+    user: { name: "食堂大妈", avatar: "https://picsum.photos/seed/u6/100/100" },
+    content: "【失物招领】在二楼西区靠窗的桌子上捡到一张校园卡，名字叫张三，已交到二楼服务台，请失主尽快来领取。",
+    image: "https://picsum.photos/seed/card/400/300",
+    likes: 45,
+    comments: 1,
+    time: "昨天",
+    height: "h-56",
+    isLatest: false,
+    tags: ["失物招领", "二楼服务台"]
+  },
+  {
+    id: 7,
+    user: { name: "匿名用户", avatar: "https://picsum.photos/seed/anon/100/100" },
+    content: "【问题反馈】二楼靠窗的桌子有些油腻，希望能加强清理频率。环境卫生需要大家共同维护。",
+    image: "",
+    likes: 88,
+    comments: 15,
+    time: "昨天",
+    height: "h-32",
+    isLatest: false,
+    tags: ["问题反馈", "环境卫生"]
+  }
 ];
 
 export function DynamicsTab() {
@@ -84,6 +122,8 @@ export function DynamicsTab() {
   const [activeTab, setActiveTab] = useState<"推荐" | "最新">("推荐");
   const [selectedPost, setSelectedPost] = useState<any>(null);
   const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
+
+  const [rating, setRating] = useState(0);
 
   const filteredPosts = useMemo(() => {
     if (activeTab === "最新") {
@@ -100,17 +140,28 @@ export function DynamicsTab() {
       onClick={() => setSelectedPost(post)}
       className="break-inside-avoid mb-4 bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
     >
-      <img
-        src={post.image}
-        alt="Post"
-        className={`w-full object-cover ${post.height}`}
-        referrerPolicy="no-referrer"
-      />
+      {post.image && (
+        <img
+          src={post.image}
+          alt="Post"
+          className={`w-full object-cover ${post.height}`}
+          referrerPolicy="no-referrer"
+        />
+      )}
       <div className="p-4">
         {post.merchantName && (
           <div className="flex items-center gap-1 text-[10px] text-[#FF6B6B] bg-red-50 w-fit px-2 py-1 rounded-md mb-2">
             <MapPin size={10} />
             <span>{post.merchantName} · {post.dishName}</span>
+          </div>
+        )}
+        {post.tags && (
+          <div className="flex gap-2 mb-2">
+            {post.tags.map((tag: string) => (
+              <span key={tag} className={cn("text-[10px] px-2 py-1 rounded-md font-bold", tag === "寻物启事" ? "bg-orange-50 text-orange-500" : tag === "失物招领" ? "bg-blue-50 text-blue-500" : tag === "问题反馈" ? "bg-red-50 text-[#FF6B6B]" : "bg-gray-50 text-gray-500")}>
+                {tag}
+              </span>
+            ))}
           </div>
         )}
         <p className="text-sm text-gray-800 line-clamp-3 mb-3 leading-relaxed">
@@ -141,7 +192,7 @@ export function DynamicsTab() {
   );
 
   return (
-    <div className="h-full bg-gray-50 flex flex-col relative">
+    <div className="h-full bg-gray-50 flex flex-col relative overflow-y-auto no-scrollbar pb-24">
       <AnimatePresence>
         {selectedMerchantId ? (
           <MerchantPage
@@ -157,128 +208,110 @@ export function DynamicsTab() {
             className="absolute inset-0 bg-white z-[60] flex flex-col"
             key="post-detail"
           >
-            <div className="flex items-center justify-between px-4 pt-6 pb-3 border-b border-gray-100 sticky top-0 bg-white z-10">
-              <button onClick={() => setSelectedPost(null)} className="p-2 text-gray-600 hover:bg-gray-50 rounded-full">
+            <div className="flex items-center px-4 pt-6 pb-3 border-b border-gray-100 sticky top-0 bg-white z-10">
+              <button onClick={() => setSelectedPost(null)} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-full">
                 <ChevronLeft size={24} />
               </button>
-              <div className="flex items-center gap-2">
-                <img src={selectedPost.user.avatar} className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
-                <span className="font-medium text-gray-900">{selectedPost.user.name}</span>
-              </div>
-              <button className="p-2 text-gray-600 hover:bg-gray-50 rounded-full">
-                <Share2 size={20} />
-              </button>
+              <span className="font-bold ml-2">帖子详情</span>
             </div>
-            <div className="flex-1 overflow-y-auto pb-24">
-              <img src={selectedPost.image} className="w-full h-auto max-h-[60vh] object-cover" referrerPolicy="no-referrer" />
-              <div className="p-6">
-                {selectedPost.merchantName && (
-                  <button 
-                    onClick={() => setSelectedMerchantId(selectedPost.merchantId)}
-                    className="flex items-center gap-2 text-sm text-[#FF6B6B] bg-red-50 px-3 py-2 rounded-xl mb-4 hover:bg-red-100 transition-colors"
-                  >
-                    <MapPin size={16} />
-                    <span className="font-medium">{selectedPost.merchantName}</span>
-                    <span className="text-gray-400 mx-1">|</span>
-                    <span>{selectedPost.dishName}</span>
-                    <ChevronLeft size={16} className="rotate-180 ml-auto" />
-                  </button>
-                )}
-                <p className="text-gray-800 text-lg leading-relaxed mb-4">{selectedPost.content}</p>
-                <div className="text-sm text-gray-400 mb-6">{selectedPost.time}</div>
-                
-                <div className="border-t border-gray-100 pt-6">
-                  <h3 className="font-bold text-gray-900 mb-4">共 {selectedPost.comments} 条评论</h3>
-                  <div className="flex gap-3 mb-6">
-                    <img src="https://picsum.photos/seed/user/100/100" className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
-                    <div className="flex-1 bg-gray-50 rounded-2xl px-4 py-2 text-sm text-gray-500">
-                      说点什么...
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-safe flex items-center justify-between px-6">
-              <div className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm text-gray-500 mr-4">
-                说点什么...
-              </div>
-              <div className="flex items-center gap-6 text-gray-600">
-                <div className="flex items-center gap-1">
-                  <Heart size={24} />
-                  <span className="text-sm">{selectedPost.likes}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <MessageCircle size={24} />
-                  <span className="text-sm">{selectedPost.comments}</span>
-                </div>
-              </div>
-            </div>
+            <SharedPostDetail 
+              post={selectedPost} 
+              onMerchantClick={(id) => setSelectedMerchantId(id)} 
+            />
           </motion.div>
         ) : isPublishing ? (
           <PublishPage
             onBack={() => setIsPublishing(false)}
             key="publish-page"
           />
-        ) : (
-          <motion.div
-            key="dynamics-list"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="flex-1 overflow-y-auto no-scrollbar pb-24"
-          >
-            {/* Header */}
-            <div 
-              className="px-6 pt-6 pb-3 sticky top-0 z-10 text-white shadow-sm"
-              style={{ backgroundColor: THEME.colors.primary }}
-            >
-              <div className="flex justify-between items-center max-w-7xl mx-auto w-full">
-                <h1 className="text-2xl font-bold">食堂圈</h1>
-                <div className="flex gap-6">
-                  <button 
-                    onClick={() => setActiveTab("推荐")}
-                    className={cn(
-                      "text-sm font-bold pb-1 transition-all relative",
-                      activeTab === "推荐" ? "text-white" : "text-white/70"
-                    )}
-                  >
-                    推荐
-                    {activeTab === "推荐" && (
-                      <motion.div layoutId="tab-indicator" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-white rounded-full" />
-                    )}
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab("最新")}
-                    className={cn(
-                      "text-sm font-bold pb-1 transition-all relative",
-                      activeTab === "最新" ? "text-white" : "text-white/70"
-                    )}
-                  >
-                    最新
-                    {activeTab === "最新" && (
-                      <motion.div layoutId="tab-indicator" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-white rounded-full" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Waterfall Layout */}
-            <div className="px-4 py-4 max-w-7xl mx-auto w-full">
-              <div className="columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
-                {filteredPosts.map(renderPost)}
-              </div>
-            </div>
-
-            {/* FAB */}
-            <FloatingActionButton
-              onClick={() => setIsPublishing(true)}
-              icon={<Plus size={24} />}
-              className="bottom-20 right-4 md:bottom-8 md:right-8"
-            />
-          </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
+
+      {/* Header */}
+      <div 
+        className="px-6 pt-6 pb-24 text-white relative overflow-hidden"
+        style={{ backgroundColor: THEME.colors.primary }}
+      >
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
+        <div className="flex justify-between items-center relative z-10 max-w-7xl mx-auto w-full">
+          <div className="flex items-end gap-6">
+            <h1 className="text-2xl font-bold">食堂圈</h1>
+            <div className="flex gap-4 mb-0.5">
+              <button 
+                onClick={() => setActiveTab("推荐")}
+                className={cn(
+                  "text-sm font-bold pb-1 transition-all relative",
+                  activeTab === "推荐" ? "text-white" : "text-white/70"
+                )}
+              >
+                推荐
+                {activeTab === "推荐" && (
+                  <motion.div layoutId="tab-indicator" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-white rounded-full" />
+                )}
+              </button>
+              <button 
+                onClick={() => setActiveTab("最新")}
+                className={cn(
+                  "text-sm font-bold pb-1 transition-all relative",
+                  activeTab === "最新" ? "text-white" : "text-white/70"
+                )}
+              >
+                最新
+                {activeTab === "最新" && (
+                  <motion.div layoutId="tab-indicator" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-white rounded-full" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto w-full px-6 -mt-12 md:-mt-16 relative z-10 space-y-6 md:space-y-8">
+        {/* Quick Publish Card */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <img src="https://picsum.photos/seed/m2/100/100" className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm">健康轻食沙拉</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">招牌鸡胸肉沙拉</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          size={20}
+                          onClick={() => setRating(star)}
+                          className={cn(
+                            "cursor-pointer transition-colors",
+                            rating >= star ? "text-amber-400 fill-amber-400" : "text-gray-200"
+                          )}
+                        />
+                      ))}
+                    </div>
+                    <button 
+                      disabled={rating === 0}
+                      className="px-4 py-1.5 bg-[#FF6B6B] text-white text-xs font-bold rounded-full shadow-sm disabled:opacity-50 transition-colors"
+                    >
+                      发布评分
+                    </button>
+                  </div>
+                </div>
+                <div 
+                  onClick={() => setIsPublishing(true)}
+                  className="bg-gray-50 rounded-2xl px-4 py-3 text-sm text-gray-400 cursor-text hover:bg-gray-100 transition-colors flex items-center gap-2"
+                >
+                  写下你的长评，分享美食体验...
+                </div>
+        </div>
+
+        {/* Waterfall Layout */}
+        <div className="columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
+          {filteredPosts.map(renderPost)}
+        </div>
+      </div>
     </div>
   );
 }

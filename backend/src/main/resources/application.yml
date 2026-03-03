@@ -1,6 +1,11 @@
 server:
   port: 8081  # 若 8080 被占用可改用 8081；改回 8080 需先关闭占用该端口的进程
 
+# AI 服务（FastAPI）地址，供 /api/ai/chat 转调
+ai:
+  service:
+    base-url: http://localhost:8000
+
 spring:
   application:
     name: scs-backend

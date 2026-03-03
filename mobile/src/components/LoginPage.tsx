@@ -30,7 +30,7 @@ export function LoginPage({ onBack, onLogin }: LoginPageProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="absolute inset-0 bg-white z-[100] flex flex-col"
+      className="fixed inset-0 bg-white z-[100] flex flex-col"
     >
       <div className="px-6 pt-6 pb-3 sticky top-0 z-10 flex items-center">
         <button onClick={onBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-full transition-colors">

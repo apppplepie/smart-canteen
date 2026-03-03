@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Search, Star, Clock, MapPin, ChevronRight, Flame } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { MerchantPage } from "./MerchantPage";
+import { cn } from "../lib/utils";
 
 import { THEME } from "../config/theme";
 
@@ -54,9 +55,21 @@ const MERCHANTS = [
 
 export function OrderingTab() {
   const [selectedMerchant, setSelectedMerchant] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"推荐" | "最快">("推荐");
+
+  const sortedMerchants = useMemo(() => {
+    if (activeTab === "最快") {
+      return [...MERCHANTS].sort((a, b) => {
+        const timeA = parseInt(a.time.split("-")[0]);
+        const timeB = parseInt(b.time.split("-")[0]);
+        return timeA - timeB;
+      });
+    }
+    return MERCHANTS;
+  }, [activeTab]);
 
   return (
-    <div className="h-full bg-gray-50 flex flex-col relative">
+    <div className="h-full bg-gray-50 flex flex-col relative overflow-y-auto no-scrollbar pb-24">
       <AnimatePresence>
         {selectedMerchant ? (
           <MerchantPage
@@ -64,105 +77,128 @@ export function OrderingTab() {
             onBack={() => setSelectedMerchant(null)}
             key="merchant-page"
           />
-        ) : (
-          <motion.div
-            key="ordering-list"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, x: -50 }}
-            className="flex-1 overflow-y-auto no-scrollbar pb-20"
-          >
-            {/* Header */}
-            <div 
-              className="px-6 pt-6 pb-3 sticky top-0 z-10 shadow-sm"
-              style={{ backgroundColor: THEME.colors.primary }}
-            >
-              <div className="max-w-7xl mx-auto">
-                <div className="relative">
+        ) : null}
+      </AnimatePresence>
+
+      {/* Header */}
+      <div 
+        className="px-6 pt-6 pb-24 text-white relative overflow-hidden"
+        style={{ backgroundColor: THEME.colors.primary }}
+      >
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
+        <div className="flex justify-between items-center relative z-10 max-w-7xl mx-auto w-full">
+          <div className="flex items-end gap-6">
+            <h1 className="text-2xl font-bold">点餐</h1>
+            <div className="flex gap-4 mb-0.5">
+              <button 
+                onClick={() => setActiveTab("推荐")}
+                className={cn(
+                  "text-sm font-bold pb-1 transition-all relative",
+                  activeTab === "推荐" ? "text-white" : "text-white/70"
+                )}
+              >
+                推荐
+                {activeTab === "推荐" && (
+                  <motion.div layoutId="ordering-tab-indicator" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-white rounded-full" />
+                )}
+              </button>
+              <button 
+                onClick={() => setActiveTab("最快")}
+                className={cn(
+                  "text-sm font-bold pb-1 transition-all relative",
+                  activeTab === "最快" ? "text-white" : "text-white/70"
+                )}
+              >
+                最快
+                {activeTab === "最快" && (
+                  <motion.div layoutId="ordering-tab-indicator" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-white rounded-full" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto w-full px-6 -mt-12 md:-mt-16 relative z-10 space-y-6 md:space-y-8">
+        {/* Search & Categories Card */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+                <div className="relative mb-4">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                   <input 
                     type="text" 
                     placeholder="搜索食堂商家、菜品..." 
-                    className="w-full bg-white rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 transition-all shadow-sm"
+                    className="w-full bg-gray-50 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B6B]/50 transition-all border border-gray-100"
                   />
                 </div>
-              </div>
-            </div>
-
-            {/* Categories */}
-            <div className="px-6 py-6">
-              <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 max-w-7xl mx-auto">
-                {['全部', '面食', '米饭', '轻食', '饮品', '小吃'].map((cat, i) => (
-                  <button 
-                    key={cat}
-                    className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-colors ${
-                      i === 0 ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 shadow-sm border border-gray-100 hover:bg-gray-50'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Merchants List */}
-            <div className="px-6 pb-6">
-              <div className="max-w-7xl mx-auto">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    附近推荐 <Flame className="text-orange-500" size={18} />
-                  </h2>
-                </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-                  {MERCHANTS.map((merchant) => (
-                    <motion.div 
-                      whileHover={{ y: -4 }}
-                      whileTap={{ scale: 0.98 }}
-                      key={merchant.id}
-                      onClick={() => setSelectedMerchant(merchant)}
-                      className="bg-white rounded-3xl p-3 shadow-sm border border-gray-100 flex gap-4 cursor-pointer hover:shadow-md transition-all"
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                  {['全部', '面食', '米饭', '轻食', '饮品', '小吃'].map((cat, i) => (
+                    <button 
+                      key={cat}
+                      className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                        i === 0 ? 'bg-[#FF6B6B] text-white shadow-sm shadow-red-200' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                      }`}
                     >
-                      <img 
-                        src={merchant.image} 
-                        alt={merchant.name} 
-                        className="w-28 h-28 rounded-2xl object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="flex-1 py-1 flex flex-col justify-between">
-                        <div>
-                          <h3 className="font-bold text-gray-900 text-lg">{merchant.name}</h3>
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                            <span className="flex items-center text-amber-500 font-medium">
-                              <Star size={12} className="fill-amber-500 mr-0.5" /> {merchant.rating}
-                            </span>
-                            <span>月售 {merchant.reviews}</span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex gap-2 mt-2 flex-wrap">
-                          {merchant.tags.map(tag => (
-                            <span key={tag} className="text-[10px] px-2 py-1 bg-gray-50 text-gray-600 rounded-md">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        
-                        <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
-                          <div className="flex items-center gap-3">
-                            <span className="flex items-center gap-1"><Clock size={12} /> {merchant.time}</span>
-                            <span className="flex items-center gap-1"><MapPin size={12} /> {merchant.distance}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
+                      {cat}
+                    </button>
                   ))}
                 </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+
+        {/* Merchants List */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              附近推荐 <Flame className="text-orange-500" size={18} />
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+            {sortedMerchants.map((merchant) => (
+              <motion.div 
+                whileHover={{ y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                key={merchant.id}
+                onClick={() => setSelectedMerchant(merchant)}
+                className="bg-white rounded-3xl p-3 shadow-sm border border-gray-100 flex gap-4 cursor-pointer hover:shadow-md transition-all"
+              >
+                <img 
+                  src={merchant.image} 
+                  alt={merchant.name} 
+                  className="w-28 h-28 rounded-2xl object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="flex-1 py-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-lg">{merchant.name}</h3>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                      <span className="flex items-center text-amber-500 font-medium">
+                        <Star size={12} className="fill-amber-500 mr-0.5" /> {merchant.rating}
+                      </span>
+                      <span>月售 {merchant.reviews}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {merchant.tags.map(tag => (
+                      <span key={tag} className="text-[10px] px-2 py-1 bg-gray-50 text-gray-600 rounded-md">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  
+                  <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1"><Clock size={12} /> {merchant.time}</span>
+                      <span className="flex items-center gap-1"><MapPin size={12} /> {merchant.distance}</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

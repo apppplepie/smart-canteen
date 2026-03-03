@@ -10,7 +10,7 @@ import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   CartesianGrid, ReferenceArea, Brush, Area, AreaChart
 } from 'recharts';
-import { tempData, foodSafetyReports, foodSafetySamples, foodSafetyAllergens } from '../mocks/foodSafety';
+import { useFoodSafety } from '../hooks/useBackendData';
 
 // --- Custom Tooltip ---
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -131,10 +131,10 @@ const TrustGauge = () => {
 };
 
 // --- Report Cards Component ---
-const ReportCards = () => {
+const ReportCards = ({ reports }: { reports: Array<{ id: number; type: string; result: string; agency: string; time: string; icon?: React.ReactNode }> }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full pt-12">
-      {foodSafetyReports.map((report, idx) => (
+      {reports.map((report, idx) => (
         <motion.div
           key={idx}
           initial={{ opacity: 0, y: 20 }}
@@ -181,6 +181,7 @@ const ReportCards = () => {
 
 // --- Main Component ---
 export default function FoodSafety() {
+  const { tempData, reports, samples, allergens, loading } = useFoodSafety();
   return (
     <PageContainer>
       <style>{`
@@ -225,7 +226,7 @@ export default function FoodSafety() {
                 实时检测公示
               </h2>
             </div>
-            <ReportCards />
+            <ReportCards reports={reports} />
           </motion.div>
         </div>
 
@@ -316,7 +317,7 @@ export default function FoodSafety() {
               <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-900/80 to-transparent z-10 pointer-events-none" />
               
               <div className="animate-scroll-y flex flex-col gap-3 pt-2">
-                {[...foodSafetySamples, ...foodSafetySamples].map((sample, idx) => (
+                {[...samples, ...samples].map((sample, idx) => (
                   <div key={idx} className="bg-black/20 border border-white/5 rounded-2xl p-4 hover:bg-white/5 transition-colors cursor-pointer group">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
@@ -362,7 +363,7 @@ export default function FoodSafety() {
               <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-900/80 to-transparent z-10 pointer-events-none" />
               
               <div className="animate-scroll-y flex flex-col gap-4 pt-2">
-                {[...foodSafetyAllergens, ...foodSafetyAllergens].map((item, idx) => (
+                {[...allergens, ...allergens].map((item, idx) => (
                   <div key={idx} className="bg-black/20 border border-white/5 rounded-2xl p-5">
                     <h3 className="text-white font-bold mb-3 flex items-center gap-2">
                       <Store className="w-4 h-4 text-slate-400" />

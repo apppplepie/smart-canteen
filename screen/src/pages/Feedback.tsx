@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
-import { barData, latestFeedbacks } from '../mocks/feedback';
+import { useFeedback } from '../hooks/useBackendData';
 
 const getThemeClasses = (theme: string) => {
   switch (theme) {
@@ -54,6 +54,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 // --- Main Component ---
 export default function Feedback() {
+  const { barData, latestFeedbacks, loading } = useFeedback();
   return (
     <PageContainer>
       <div className="bg-slate-950 rounded-[2rem] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.2)] relative min-h-[calc(100vh-8rem)] p-6 md:p-8">
@@ -94,6 +95,7 @@ export default function Feedback() {
             </div>
 
             <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              {loading && <div className="text-slate-400 text-sm">加载中...</div>}
               {latestFeedbacks.map((item, idx) => (
                 <motion.div
                   key={item.id}

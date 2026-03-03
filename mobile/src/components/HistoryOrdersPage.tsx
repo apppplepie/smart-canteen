@@ -57,7 +57,7 @@ export function HistoryOrdersPage({ onBack }: { onBack: () => void }) {
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 50 }}
-      className="absolute inset-0 bg-gray-50 z-[60] flex flex-col"
+      className="fixed inset-0 bg-gray-50 z-[100] flex flex-col"
     >
       {/* Header */}
       <div 

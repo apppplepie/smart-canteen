@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { Home, Compass, User, Sparkles } from "lucide-react";
+import { Home, Compass, User, Sparkles, Store } from "lucide-react";
 import { OrderingTab } from "./components/OrderingTab";
 import { DynamicsTab } from "./components/DynamicsTab";
 import { ProfileTab } from "./components/ProfileTab";
 import { AIAssistantTab } from "./components/AIAssistantTab";
+import { CanteenOnlineTab } from "./components/CanteenOnlineTab";
 import { cn } from "./lib/utils";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -13,7 +14,8 @@ export default function App() {
   const tabs = [
     { id: "ordering", label: "点餐", icon: Home },
     { id: "dynamics", label: "动态", icon: Compass },
-    { id: "assistant", label: "AI助手", icon: Sparkles },
+    { id: "assistant", label: "AI助手", icon: Sparkles, isPrimary: true },
+    { id: "online", label: "在线", icon: Store },
     { id: "profile", label: "我的", icon: User },
   ];
 
@@ -31,6 +33,24 @@ export default function App() {
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            
+            if (tab.isPrimary) {
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 my-2 group relative overflow-hidden bg-gradient-to-r from-[#FF6B6B] to-[#FF8E8E] text-white shadow-md shadow-[#FF6B6B]/30 hover:shadow-lg hover:shadow-[#FF6B6B]/40 hover:-translate-y-0.5",
+                    isActive ? "ring-2 ring-red-200 ring-offset-2" : ""
+                  )}
+                >
+                  <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
+                  <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className="relative z-10" />
+                  <span className="text-[15px] font-bold relative z-10">{tab.label}</span>
+                </button>
+              );
+            }
+
             return (
               <button
                 key={tab.id}
@@ -64,22 +84,47 @@ export default function App() {
             {activeTab === "ordering" && <OrderingTab />}
             {activeTab === "dynamics" && <DynamicsTab />}
             {activeTab === "assistant" && <AIAssistantTab />}
+            {activeTab === "online" && <CanteenOnlineTab />}
             {activeTab === "profile" && <ProfileTab onNavigate={setActiveTab} />}
           </motion.div>
         </AnimatePresence>
       </div>
 
       {/* Bottom Navigation (Mobile) */}
-      <div className="md:hidden bg-white border-t border-gray-100 px-6 py-3 flex justify-between items-center pb-safe z-20">
+      <div className="md:hidden bg-white border-t border-gray-100 px-4 py-2 flex justify-between items-center pb-safe z-20 relative">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
+          
+          if (tab.isPrimary) {
+            return (
+              <div key={tab.id} className="relative -top-4 flex flex-col items-center justify-center w-16">
+                <button
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg shadow-[#FF6B6B]/40 relative overflow-hidden group bg-gradient-to-tr from-[#FF6B6B] to-[#FF8E8E] text-white",
+                    isActive ? "scale-110 ring-4 ring-red-100" : "scale-100 hover:scale-105"
+                  )}
+                >
+                  <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="relative z-10 text-white" />
+                </button>
+                <span className={cn(
+                  "text-[10px] font-bold mt-1.5 transition-all duration-300",
+                  isActive ? "text-[#FF6B6B]" : "text-gray-500"
+                )}>
+                  {tab.label}
+                </span>
+              </div>
+            );
+          }
+
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "flex flex-col items-center justify-center w-16 gap-1 transition-colors duration-200",
+                "flex flex-col items-center justify-center w-14 gap-1 transition-colors duration-200",
                 isActive
                   ? "text-[#FF6B6B]"
                   : "text-gray-400 hover:text-gray-600",
@@ -87,7 +132,7 @@ export default function App() {
             >
               <div
                 className={cn(
-                  "p-2 rounded-2xl transition-all duration-300",
+                  "p-1.5 rounded-2xl transition-all duration-300",
                   isActive ? "bg-red-50 scale-110" : "bg-transparent scale-100",
                 )}
               >

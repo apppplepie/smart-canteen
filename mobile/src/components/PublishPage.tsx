@@ -1,18 +1,38 @@
 import React, { useState } from "react";
-import { X, Image as ImageIcon, MapPin, Hash, Smile, Send } from "lucide-react";
-import { motion } from "motion/react";
+import { X, Image as ImageIcon, MapPin, Hash, Smile, Send, Star, ChevronRight } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { cn } from "../lib/utils";
+import { HistoryOrdersPage } from "./HistoryOrdersPage";
 
 export function PublishPage({ onBack }: { onBack: () => void; key?: string }) {
   const [content, setContent] = useState("");
+  const [rating, setRating] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState({
+    name: "健康轻食沙拉",
+    items: "招牌鸡胸肉沙拉",
+    image: "https://picsum.photos/seed/m2/100/100"
+  });
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: "100%" }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: "100%" }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="absolute inset-0 bg-white z-50 flex flex-col"
-    >
+    <>
+      <AnimatePresence>
+        {showHistory && (
+          <HistoryOrdersPage 
+            onBack={() => setShowHistory(false)} 
+            // We'll just use the back button to close it for now, 
+            // in a real app we'd pass an onSelect callback to HistoryOrdersPage
+          />
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        initial={{ opacity: 0, y: "100%" }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: "100%" }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className="fixed inset-0 bg-white z-[100] flex flex-col"
+      >
       {/* Header */}
       <div className="flex items-center justify-between px-6 pt-6 pb-3 border-b border-gray-100 sticky top-0 bg-white">
         <div className="max-w-2xl mx-auto w-full flex items-center justify-between">
@@ -34,6 +54,46 @@ export function PublishPage({ onBack }: { onBack: () => void; key?: string }) {
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto w-full">
+        
+        {/* Order Selection & Rating */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-6">
+          <div 
+            onClick={() => setShowHistory(true)}
+            className="flex items-center justify-between mb-4 pb-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 rounded-xl p-2 -mx-2 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <img src={selectedOrder.image} className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
+              <div>
+                <h3 className="font-bold text-gray-900 text-sm">{selectedOrder.name}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{selectedOrder.items}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-gray-400">
+              <span className="text-xs">切换评价餐品</span>
+              <ChevronRight size={16} />
+            </div>
+          </div>
+          
+          <div className="flex flex-col items-center gap-3 py-2">
+            <span className="text-sm font-bold text-gray-900">
+              {rating === 0 ? "点击星星评分" : `${rating} 星好评`}
+            </span>
+            <div className="flex items-center gap-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  size={32}
+                  onClick={() => setRating(star)}
+                  className={cn(
+                    "cursor-pointer transition-colors",
+                    rating >= star ? "text-amber-400 fill-amber-400" : "text-gray-200"
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -85,5 +145,6 @@ export function PublishPage({ onBack }: { onBack: () => void; key?: string }) {
         </div>
       </div>
     </motion.div>
+    </>
   );
 }
