@@ -2,6 +2,11 @@ package com.scs.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scs.dto.ApiResult;
+import com.scs.entity.AiConversation;
+import com.scs.entity.AiMessage;
+import com.scs.repository.AiConversationRepository;
+import com.scs.repository.AiMessageRepository;
+import com.scs.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,81 +14,236 @@ import org.springframework.http.MediaType;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
- * 最简单：只接前端消息，原样转发给 FastAPI ai-service，把返回的 content 带回前端。
- * 前端 POST /api/ai/chat，body: { "messages": [ { "role", "content" } ] }
+ * AI 对话：前端 POST /api/ai/chat 发消息；Spring Boot 存库 → 转发 FastAPI → 存助手回复 → 返回。
+ * 数据流：先存用户消息 → 调 FastAPI → 成功后再存助手消息并更新会话时间。
  */
 @RestController
 @RequestMapping("/api/ai")
 public class AiChatController {
 
     private static final Logger log = LoggerFactory.getLogger(AiChatController.class);
+    private static final int TITLE_MAX_LEN = 80;
 
     private final String aiServiceBaseUrl;
     private final ObjectMapper objectMapper;
+    private final AiConversationRepository conversationRepo;
+    private final AiMessageRepository messageRepo;
+    private final UserRepository userRepo;
 
     public AiChatController(
             @Value("${ai.service.base-url:http://localhost:8000}") String aiServiceBaseUrl,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AiConversationRepository conversationRepo,
+            AiMessageRepository messageRepo,
+            UserRepository userRepo) {
         this.aiServiceBaseUrl = aiServiceBaseUrl;
         this.objectMapper = objectMapper;
+        this.conversationRepo = conversationRepo;
+        this.messageRepo = messageRepo;
+        this.userRepo = userRepo;
     }
 
-    /** GET /api/ai 或 /api/ai/health 都能用来确认本服务是否生效，避免 404 */
     @GetMapping(value = {"", "/health"}, produces = MediaType.APPLICATION_JSON_VALUE)
     public ApiResult<Map<String, String>> health() {
         return ApiResult.ok(Map.of("service", "scs-backend", "ai", "ok", "chat", "POST /api/ai/chat"));
     }
 
-    /** 浏览器直接打开 /api/ai/chat 会发 GET，返回此 JSON 而不是 405 Whitelabel */
     @GetMapping(value = "/chat", produces = MediaType.APPLICATION_JSON_VALUE)
     public ApiResult<Map<String, String>> chatGet() {
         return ApiResult.ok(Map.of("message", "请用 POST 发送 messages，本接口不接受 GET"));
     }
 
+    /**
+     * 从 FastAPI 错误响应体解析 detail（字符串或校验数组），用于返回给前端的错误信息。
+     */
+    private String parseFastApiDetail(String body) {
+        if (body == null || body.isBlank()) return null;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = objectMapper.readValue(body, Map.class);
+            Object detail = map.get("detail");
+            if (detail == null) return null;
+            if (detail instanceof String s) return s;
+            if (detail instanceof List<?> list && !list.isEmpty()) {
+                Object first = list.get(0);
+                if (first instanceof Map<?, ?> m && m.get("msg") != null) return String.valueOf(m.get("msg"));
+                return first.toString();
+            }
+            return detail.toString();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * POST /api/ai/chat
+     * body: { "messages": [...], "conversationId": 可选, "userId": 可选 }
+     * 流程：取/建会话 → 存用户消息 → 转发 FastAPI → 存助手消息 → 返回 content + conversationId
+     */
     @PostMapping(value = "/chat", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ApiResult<Map<String, String>> chat(@RequestBody Map<String, Object> body) {
+    public ApiResult<Map<String, Object>> chat(@RequestBody Map<String, Object> body) {
         @SuppressWarnings("unchecked")
         List<Map<String, String>> messages = (List<Map<String, String>>) body.get("messages");
         if (messages == null || messages.isEmpty()) {
             return ApiResult.fail(400, "messages 不能为空");
         }
-        // 终端打印：消息条数 + 最后一条用户消息
-        String lastUser = messages.stream()
+
+        Long conversationId = body.get("conversationId") != null ? ((Number) body.get("conversationId")).longValue() : null;
+        Long userId = body.get("userId") != null ? ((Number) body.get("userId")).longValue() : null;
+
+        String lastUserContent = messages.stream()
                 .filter(m -> "user".equals(m.get("role")))
                 .reduce((a, b) -> b)
                 .map(m -> m.get("content"))
                 .orElse("");
-        log.info("[AI chat] 收到消息数: {}, 最后一条(user): {}", messages.size(), lastUser);
+        log.info("[AI chat] 消息数: {}, conversationId: {}, 最后(user): {}", messages.size(), conversationId, lastUserContent);
+
+        AiConversation conversation;
+        if (conversationId != null) {
+            conversation = conversationRepo.findById(conversationId).orElse(null);
+            if (conversation == null) {
+                return ApiResult.fail(404, "会话不存在");
+            }
+        } else {
+            conversation = new AiConversation();
+            if (userId != null) {
+                userRepo.findById(userId).ifPresent(conversation::setUser);
+            }
+            String title = lastUserContent.length() > TITLE_MAX_LEN
+                    ? lastUserContent.substring(0, TITLE_MAX_LEN) + "..."
+                    : lastUserContent;
+            conversation.setTitle(title.isEmpty() ? "新对话" : title);
+            conversation = conversationRepo.save(conversation);
+        }
+
+        int nextOrder = messageRepo.findMaxSortOrderByConversationId(conversation.getId()) + 1;
+        AiMessage userMsg = new AiMessage();
+        userMsg.setConversation(conversation);
+        userMsg.setRole("user");
+        userMsg.setContent(lastUserContent);
+        userMsg.setSortOrder(nextOrder);
+        messageRepo.save(userMsg);
 
         try {
             Map<String, Object> forwardBody = Map.of("messages", messages);
             String jsonBody = objectMapper.writeValueAsString(forwardBody);
-            byte[] bodyBytes = jsonBody.getBytes(StandardCharsets.UTF_8);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setContentLength(bodyBytes.length);
-            HttpEntity<byte[]> entity = new HttpEntity<>(bodyBytes, headers);
+            HttpEntity<byte[]> entity = new HttpEntity<>(jsonBody.getBytes(StandardCharsets.UTF_8), headers);
             RestTemplate restTemplate = new RestTemplate();
             String responseBody = restTemplate.postForObject(aiServiceBaseUrl + "/api/chat", entity, String.class);
-            log.debug("[AI chat] FastAPI 响应长度: {}", responseBody != null ? responseBody.length() : 0);
+
             @SuppressWarnings("unchecked")
             Map<String, Object> response = responseBody != null ? objectMapper.readValue(responseBody, Map.class) : null;
             String content = response != null && response.get("content") != null
                     ? response.get("content").toString()
                     : "";
-            log.info("[AI chat] 助手回复: {}", content.length() > 200 ? content.substring(0, 200) + "..." : content);
-            return ApiResult.ok(Map.of("content", content));
+
+            AiMessage assistantMsg = new AiMessage();
+            assistantMsg.setConversation(conversation);
+            assistantMsg.setRole("assistant");
+            assistantMsg.setContent(content);
+            assistantMsg.setSortOrder(nextOrder + 1);
+            messageRepo.save(assistantMsg);
+
+            conversation.setTitle(conversation.getTitle());
+            conversationRepo.save(conversation);
+
+            log.info("[AI chat] 助手回复已存库, conversationId={}", conversation.getId());
+            return ApiResult.ok(Map.of(
+                    "content", content,
+                    "conversationId", conversation.getId()
+            ));
+        } catch (HttpStatusCodeException e) {
+            int status = e.getStatusCode().value();
+            String errorBody = e.getResponseBodyAsString();
+            String message = parseFastApiDetail(errorBody);
+            if (message == null) message = "AI 服务返回 " + status + ": " + (e.getMessage() != null ? e.getMessage() : errorBody);
+            log.warn("[AI chat] FastAPI 错误 status={}, body={}, message={}", status, errorBody, message);
+            saveErrorMessage(conversation, nextOrder + 1, message);
+            return ApiResult.fail(status >= 400 && status < 600 ? status : 502, message);
         } catch (Exception e) {
+            String message = "AI 服务不可用: " + e.getMessage();
             log.warn("[AI chat] 转发失败: {}", e.getMessage());
-            return ApiResult.fail(502, "AI 服务不可用: " + e.getMessage());
+            saveErrorMessage(conversation, nextOrder + 1, message);
+            return ApiResult.fail(502, message);
         }
+    }
+
+    /** 将错误信息存为一条 assistant 消息，保证会话历史与用户所见一致 */
+    private void saveErrorMessage(AiConversation conversation, int sortOrder, String message) {
+        try {
+            AiMessage errMsg = new AiMessage();
+            errMsg.setConversation(conversation);
+            errMsg.setRole("assistant");
+            errMsg.setContent(message);
+            errMsg.setSortOrder(sortOrder);
+            messageRepo.save(errMsg);
+            conversation.setTitle(conversation.getTitle());
+            conversationRepo.save(conversation);
+        } catch (Exception ex) {
+            log.warn("[AI chat] 存库错误消息失败: {}", ex.getMessage());
+        }
+    }
+
+    /**
+     * GET /api/ai/conversations?userId= 会话列表，按 updated_at 倒序。未传 userId 时返回空（未登录不展示历史）
+     */
+    @GetMapping(value = "/conversations", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ApiResult<List<Map<String, Object>>> listConversations(@RequestParam(required = false) Long userId) {
+        List<AiConversation> list;
+        if (userId != null) {
+            list = conversationRepo.findByUser_IdOrderByUpdatedAtDesc(userId);
+        } else {
+            list = List.of();
+        }
+        List<Map<String, Object>> data = list.stream().map(c -> Map.<String, Object>of(
+                "id", c.getId(),
+                "title", c.getTitle() != null ? c.getTitle() : "新对话",
+                "updatedAt", c.getUpdatedAt().toString()
+        )).collect(Collectors.toList());
+        return ApiResult.ok(data);
+    }
+
+    /**
+     * GET /api/ai/conversations/{id}/messages 某会话的消息列表，按 sort_order/created_at 正序
+     */
+    @GetMapping(value = "/conversations/{id}/messages", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ApiResult<List<Map<String, Object>>> listMessages(@PathVariable Long id) {
+        if (id == null) return ApiResult.fail(400, "会话 id 不能为空");
+        Optional<AiConversation> conv = conversationRepo.findById(id);
+        if (conv.isEmpty()) {
+            return ApiResult.fail(404, "会话不存在");
+        }
+        List<AiMessage> messages = messageRepo.findByConversation_IdOrderBySortOrderAscCreatedAtAsc(id);
+        List<Map<String, Object>> data = messages.stream()
+                .filter(m -> "user".equals(m.getRole()) || "assistant".equals(m.getRole()))
+                .map(m -> {
+                    Map<String, Object> map = new java.util.HashMap<>(Map.of(
+                            "id", m.getId(),
+                            "role", m.getRole(),
+                            "content", m.getContent() != null ? m.getContent() : ""
+                    ));
+                    if (m.getSuggestions() != null && !m.getSuggestions().isEmpty()) {
+                        try {
+                            @SuppressWarnings("unchecked")
+                            List<String> sug = objectMapper.readValue(m.getSuggestions(), List.class);
+                            map.put("suggestions", sug);
+                        } catch (Exception ignored) {}
+                    }
+                    return map;
+                })
+                .collect(Collectors.toList());
+        return ApiResult.ok(data);
     }
 }

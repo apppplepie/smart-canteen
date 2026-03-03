@@ -35,47 +35,71 @@ const INITIAL_SUGGESTIONS = [
   "今天有什么特价菜？",
 ];
 
+const WELCOME_MSG: Message = {
+  id: "welcome",
+  role: "assistant",
+  content:
+    "你好！我是你的食堂AI点餐助手 🤖\n\n不知道吃什么？时间太紧？或者想找点特定口味的菜品？随时问我！",
+  suggestions: INITIAL_SUGGESTIONS,
+};
+
+function formatConversationTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (dDate.getTime() === today.getTime()) return "今天 " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  if (dDate.getTime() === yesterday.getTime()) return "昨天 " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  const weekdays = "周日周一周二周三周四周五周六";
+  return weekdays[d.getDay()] + " " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+}
+
 export function AIAssistantTab() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content:
-        "你好！我是你的食堂AI点餐助手 🤖\n\n不知道吃什么？时间太紧？或者想找点特定口味的菜品？随时问我！",
-      suggestions: INITIAL_SUGGESTIONS,
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MSG]);
+  const [conversationId, setConversationId] = useState<number | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [historyChats, setHistoryChats] = useState<{ id: number; title: string; time: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const historyChats = [
-    { id: 1, title: "推荐低脂减脂餐", time: "今天 12:30" },
-    { id: 2, title: "想吃点辣的", time: "昨天 18:15" },
-    { id: 3, title: "现在哪个档口排队最少？", time: "周二 11:45" },
-  ];
-
-  const startNewChat = () => {
-    setMessages([
-      {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: "你好！我是你的食堂AI点餐助手 🤖\n\n不知道吃什么？时间太紧？或者想找点特定口味的菜品？随时问我！",
-        suggestions: INITIAL_SUGGESTIONS,
-      },
-    ]);
+  const fetchHistoryChats = async () => {
+    if (!API_BASE_URL) return;
+    try {
+      const url = `${API_BASE_URL}/api/ai/conversations`;
+      const res = await fetch(url);
+      const raw = await res.text();
+      const data = raw ? JSON.parse(raw) : {};
+      const list = (data?.data ?? []) as { id: number; title: string; updatedAt: string }[];
+      setHistoryChats(list.map((c) => ({ id: c.id, title: c.title || "新对话", time: formatConversationTime(c.updatedAt) })));
+    } catch (e) {
+      console.warn("拉取历史对话失败", e);
+    }
   };
 
-  const loadHistoryChat = (chatId: number) => {
-    // Mock loading history
-    setMessages([
-      {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: `这是历史对话记录 #${chatId} 的内容。`,
-      }
-    ]);
+  useEffect(() => {
+    if (isDrawerOpen) fetchHistoryChats();
+  }, [isDrawerOpen]);
+
+  const startNewChat = () => {
+    setConversationId(null);
+    setMessages([{ ...WELCOME_MSG, id: Date.now().toString() }]);
+  };
+
+  const loadHistoryChat = async (chatId: number) => {
+    if (!API_BASE_URL) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/ai/conversations/${chatId}/messages`);
+      const raw = await res.text();
+      const data = raw ? JSON.parse(raw) : {};
+      const list = (data?.data ?? []) as { id: number; role: string; content: string; suggestions?: string[] }[];
+      setMessages(list.map((m) => ({ id: String(m.id), role: m.role as "user" | "assistant", content: m.content || "", suggestions: m.suggestions })));
+      setConversationId(chatId);
+    } catch (e) {
+      console.warn("加载对话失败", e);
+    }
     setIsDrawerOpen(false);
   };
 
@@ -123,15 +147,19 @@ export function AIAssistantTab() {
         { role: "user", content: text },
       ];
 
-      // 请求走 Spring Boot，由后端转调 FastAPI ai-service（DeepSeek）
+      const body: { messages: typeof apiMessages; conversationId?: number | null; userId?: number | null } = {
+        messages: apiMessages,
+      };
+      if (conversationId != null) body.conversationId = conversationId;
+
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify(body),
       });
 
       const raw = await res.text();
-      let data: { code?: number; data?: { content?: string }; message?: string; content?: string };
+      let data: { code?: number; data?: { content?: string; conversationId?: number }; message?: string; content?: string };
       try {
         data = raw ? JSON.parse(raw) : {};
       } catch {
@@ -140,6 +168,7 @@ export function AIAssistantTab() {
       const content =
         (data?.data?.content ?? data?.content ?? "").trim() ||
         "前端取到了空值";
+      const newConvId = data?.data?.conversationId;
 
       if (!res.ok) {
         throw new Error(data?.message ?? data?.content ?? `请求失败 ${res.status}`);
@@ -152,6 +181,7 @@ export function AIAssistantTab() {
       };
 
       setMessages((prev) => [...prev, aiMsg]);
+      if (newConvId != null) setConversationId(newConvId);
     } catch (error) {
       console.error("AI Error:", error);
       const message = error instanceof Error ? error.message : "未知错误";
@@ -222,19 +252,23 @@ export function AIAssistantTab() {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {historyChats.map((chat) => (
-                  <button
-                    key={chat.id}
-                    onClick={() => loadHistoryChat(chat.id)}
-                    className="w-full text-left p-3 rounded-xl hover:bg-gray-50 transition-colors flex items-start gap-3 group"
-                  >
-                    <MessageSquare size={18} className="text-gray-400 mt-0.5 group-hover:text-[#FF6B6B] transition-colors" />
-                    <div>
-                      <div className="font-medium text-gray-800 text-sm line-clamp-1">{chat.title}</div>
-                      <div className="text-xs text-gray-400 mt-1">{chat.time}</div>
-                    </div>
-                  </button>
-                ))}
+                {historyChats.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-4 text-center">暂无历史对话</p>
+                ) : (
+                  historyChats.map((chat) => (
+                    <button
+                      key={chat.id}
+                      onClick={() => loadHistoryChat(chat.id)}
+                      className="w-full text-left p-3 rounded-xl hover:bg-gray-50 transition-colors flex items-start gap-3 group"
+                    >
+                      <MessageSquare size={18} className="text-gray-400 mt-0.5 group-hover:text-[#FF6B6B] transition-colors" />
+                      <div>
+                        <div className="font-medium text-gray-800 text-sm line-clamp-1">{chat.title}</div>
+                        <div className="text-xs text-gray-400 mt-1">{chat.time}</div>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
             </motion.div>
           </>
