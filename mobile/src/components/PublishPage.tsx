@@ -1,27 +1,91 @@
 import React, { useState } from "react";
-import { X, Image as ImageIcon, MapPin, Hash, Smile, Send, Star, ChevronRight } from "lucide-react";
+import { X, Image as ImageIcon, MapPin, Hash, Smile, Star, ChevronRight, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { HistoryOrdersPage } from "./HistoryOrdersPage";
+import { createPost } from "../api";
+import { listOrdersByUser } from "../api/orders";
+import { getBaseUrl } from "../api/client";
 
-export function PublishPage({ onBack }: { onBack: () => void; key?: string }) {
+export function PublishPage({
+  onBack,
+  onSuccess,
+  currentUserId,
+}: {
+  onBack: () => void;
+  onSuccess?: () => void;
+  currentUserId?: number;
+  key?: string;
+}) {
   const [content, setContent] = useState("");
   const [rating, setRating] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState({
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<{ name: string; items: string; image: string; orderId?: number; vendorId?: number }>({
     name: "健康轻食沙拉",
     items: "招牌鸡胸肉沙拉",
-    image: "https://picsum.photos/seed/m2/100/100"
+    image: "https://picsum.photos/seed/m2/100/100",
   });
+
+  const handlePublish = async () => {
+    if (!content.trim()) return;
+    const base = getBaseUrl();
+    if (!base) {
+      alert("未配置后端地址，无法发布");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createPost({
+        userId: currentUserId ?? 1,
+        vendorId: selectedOrder.vendorId,
+        content: content.trim(),
+        mediaUrls: undefined,
+      });
+      onSuccess?.();
+      onBack();
+    } catch (e) {
+      alert("发布失败: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const loadHistoryForSelect = async () => {
+    if (!getBaseUrl() || !currentUserId) return;
+    try {
+      const orders = await listOrdersByUser(currentUserId);
+      if (orders.length > 0) {
+        const o = orders[0];
+        setSelectedOrder({
+          name: "订单#" + o.id,
+          items: "¥" + o.totalAmount,
+          image: "https://picsum.photos/seed/m2/100/100",
+          orderId: o.id,
+          vendorId: o.vendorId,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <>
       <AnimatePresence>
         {showHistory && (
-          <HistoryOrdersPage 
-            onBack={() => setShowHistory(false)} 
-            // We'll just use the back button to close it for now, 
-            // in a real app we'd pass an onSelect callback to HistoryOrdersPage
+          <HistoryOrdersPage
+            onBack={() => setShowHistory(false)}
+            userId={currentUserId}
+            onSelectOrder={(order) => {
+              setSelectedOrder({
+                name: order.vendorName ?? "订单",
+                items: "¥" + order.totalAmount,
+                image: order.image ?? "https://picsum.photos/seed/m2/100/100",
+                vendorId: order.vendorId,
+              });
+              setShowHistory(false);
+            }}
           />
         )}
       </AnimatePresence>
@@ -44,9 +108,11 @@ export function PublishPage({ onBack }: { onBack: () => void; key?: string }) {
           </button>
           <span className="font-bold text-gray-900">发布动态</span>
           <button
-            disabled={!content.trim()}
-            className="bg-[#FF6B6B] text-white px-5 py-2 rounded-full font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#FF8E8E] transition-colors shadow-sm shadow-red-500/20"
+            disabled={!content.trim() || submitting}
+            onClick={handlePublish}
+            className="bg-[#FF6B6B] text-white px-5 py-2 rounded-full font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#FF8E8E] transition-colors shadow-sm shadow-red-500/20 flex items-center gap-2"
           >
+            {submitting ? <Loader2 size={18} className="animate-spin" /> : null}
             发布
           </button>
         </div>
@@ -57,8 +123,11 @@ export function PublishPage({ onBack }: { onBack: () => void; key?: string }) {
         
         {/* Order Selection & Rating */}
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-6">
-          <div 
-            onClick={() => setShowHistory(true)}
+          <div
+            onClick={() => {
+              loadHistoryForSelect();
+              setShowHistory(true);
+            }}
             className="flex items-center justify-between mb-4 pb-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 rounded-xl p-2 -mx-2 transition-colors"
           >
             <div className="flex items-center gap-3">

@@ -29,9 +29,9 @@ const getHeatColor = (level: number) => {
   return "bg-red-500 text-white";
 };
 
-export function CanteenOnlineTab() {
+export function CanteenOnlineTab({ user }: { user?: { userId?: number } | null }) {
   const [crowdLevels, setCrowdLevels] = useState<number[]>([]);
-  const [selectedMerchant, setSelectedMerchant] = useState<any>(null);
+  const [selectedMerchant, setSelectedMerchant] = useState<{ id: number; name: string; image?: string; rating?: number; time?: string; distance?: string } | null>(null);
   const [activeService, setActiveService] = useState<"feedback" | "lost" | "found" | null>(null);
 
   // Initialize and update crowd levels
@@ -75,9 +75,10 @@ export function CanteenOnlineTab() {
     <div className="h-full bg-gray-50 flex flex-col relative overflow-y-auto no-scrollbar pb-24">
       <AnimatePresence>
         {selectedMerchant && (
-          <MerchantPage 
-            merchant={selectedMerchant} 
-            onBack={() => setSelectedMerchant(null)} 
+          <MerchantPage
+            merchant={selectedMerchant}
+            onBack={() => setSelectedMerchant(null)}
+            user={user}
           />
         )}
         {activeService === "feedback" && <FeedbackPage onBack={() => setActiveService(null)} />}

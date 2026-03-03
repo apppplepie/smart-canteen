@@ -3,16 +3,20 @@ import { ChevronLeft, MapPin, Clock, CreditCard, Utensils, Bike, Loader2 } from 
 import { motion, AnimatePresence } from "motion/react";
 import { THEME } from "../config/theme";
 import { cn } from "../lib/utils";
+import { createOrder } from "../api/orders";
+import { createOrderItem } from "../api/orderItems";
+import { getBaseUrl } from "../api/client";
 
 interface CheckoutPageProps {
-  merchant: any;
+  merchant: { id: number; name: string };
   cart: Record<number, number>;
   totalPrice: number;
   onBack: () => void;
-  menu: any[];
+  menu: { id: number; name: string; price: number; image?: string }[];
+  userId?: number;
 }
 
-export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu }: CheckoutPageProps) {
+export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu, userId }: CheckoutPageProps) {
   const [orderType, setOrderType] = useState<"dine-in" | "delivery">("dine-in");
   const [isPaying, setIsPaying] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -35,13 +39,43 @@ export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu }: Check
   const packageFee = 1;
   const finalPrice = totalPrice + packageFee + deliveryFee;
 
-  const handlePay = () => {
+  const handlePay = async () => {
+    const base = getBaseUrl();
+    if (!base) {
+      alert("未配置后端地址，无法下单");
+      return;
+    }
     setIsPaying(true);
-    setTimeout(() => {
-      setIsPaying(false);
-      alert("支付成功！");
+    try {
+      const deliveryFee = orderType === "delivery" ? 2 : 0;
+      const packageFee = 1;
+      const finalAmount = totalPrice + packageFee + deliveryFee;
+      const order = await createOrder({
+        userId: userId ?? 1,
+        vendorId: merchant.id,
+        totalAmount: finalAmount,
+        status: "pending",
+        queueNumber: "A" + Math.floor(100 + Math.random() * 900),
+      });
+      const entries = Object.entries(cart).filter(([, count]) => count > 0);
+      for (const [menuItemId, quantity] of entries) {
+        const item = menu.find((m) => m.id === Number(menuItemId));
+        if (item) {
+          await createOrderItem({
+            orderId: order.id,
+            menuItemId: item.id,
+            quantity,
+            priceEach: item.price,
+          });
+        }
+      }
+      alert("支付成功！取餐码: " + order.queueNumber);
       onBack();
-    }, 1500);
+    } catch (e) {
+      alert("下单失败: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setIsPaying(false);
+    }
   };
 
   return (

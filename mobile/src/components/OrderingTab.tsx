@@ -1,72 +1,79 @@
-import React, { useState, useMemo } from "react";
-import { Search, Star, Clock, MapPin, ChevronRight, Flame } from "lucide-react";
+import React, { useState, useMemo, useEffect } from "react";
+import { Search, Star, Clock, MapPin, Flame, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { MerchantPage } from "./MerchantPage";
 import { cn } from "../lib/utils";
-
 import { THEME } from "../config/theme";
+import { listVendors } from "../api/vendors";
+import { getBaseUrl } from "../api/client";
 
-const MERCHANTS = [
-  {
-    id: 1,
-    name: "川香麻辣烫",
-    rating: 4.8,
-    reviews: 1205,
-    time: "10-15 min",
-    distance: "1F 东区",
-    tags: ["麻辣鲜香", "自选"],
-    image: "https://picsum.photos/seed/m1/400/300",
-    popular: true,
-  },
-  {
-    id: 2,
-    name: "健康轻食沙拉",
-    rating: 4.9,
-    reviews: 890,
-    time: "5-10 min",
-    distance: "2F 西区",
-    tags: ["低脂", "减脂餐"],
-    image: "https://picsum.photos/seed/m2/400/300",
-    popular: false,
-  },
-  {
-    id: 3,
-    name: "老北京炸酱面",
-    rating: 4.6,
-    reviews: 2300,
-    time: "15-20 min",
-    distance: "1F 中区",
-    tags: ["面食", "地道"],
-    image: "https://picsum.photos/seed/m3/400/300",
-    popular: true,
-  },
-  {
-    id: 4,
-    name: "日式咖喱屋",
-    rating: 4.7,
-    reviews: 650,
-    time: "10-15 min",
-    distance: "2F 东区",
-    tags: ["咖喱", "日料"],
-    image: "https://picsum.photos/seed/m4/400/300",
-    popular: false,
-  },
+type Merchant = {
+  id: number;
+  name: string;
+  rating: number;
+  reviews: number;
+  time: string;
+  distance: string;
+  tags: string[];
+  image: string;
+  popular: boolean;
+};
+
+const FALLBACK_MERCHANTS: Merchant[] = [
+  { id: 1, name: "川香麻辣烫", rating: 4.8, reviews: 1205, time: "10-15 min", distance: "1F 东区", tags: ["麻辣鲜香", "自选"], image: "https://picsum.photos/seed/m1/400/300", popular: true },
+  { id: 2, name: "健康轻食沙拉", rating: 4.9, reviews: 890, time: "5-10 min", distance: "2F 西区", tags: ["低脂", "减脂餐"], image: "https://picsum.photos/seed/m2/400/300", popular: false },
+  { id: 3, name: "老北京炸酱面", rating: 4.6, reviews: 2300, time: "15-20 min", distance: "1F 中区", tags: ["面食", "地道"], image: "https://picsum.photos/seed/m3/400/300", popular: true },
+  { id: 4, name: "日式咖喱屋", rating: 4.7, reviews: 650, time: "10-15 min", distance: "2F 东区", tags: ["咖喱", "日料"], image: "https://picsum.photos/seed/m4/400/300", popular: false },
 ];
 
-export function OrderingTab() {
-  const [selectedMerchant, setSelectedMerchant] = useState<any>(null);
+export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
+  const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [activeTab, setActiveTab] = useState<"推荐" | "最快">("推荐");
+  const [merchants, setMerchants] = useState<Merchant[]>(FALLBACK_MERCHANTS);
+  const [loading, setLoading] = useState(!!getBaseUrl());
+
+  useEffect(() => {
+    const base = getBaseUrl();
+    if (!base) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await listVendors();
+        if (cancelled) return;
+        const mapped: Merchant[] = list.map((v) => ({
+          id: v.id,
+          name: v.name,
+          rating: 4.5,
+          reviews: 500,
+          time: "10-15 min",
+          distance: v.locationLabel ?? "食堂",
+          tags: v.description ? [v.description.slice(0, 6)] : ["美食"],
+          image: `https://picsum.photos/seed/m${v.id}/400/300`,
+          popular: v.id % 2 === 1,
+        }));
+        setMerchants(mapped.length ? mapped : FALLBACK_MERCHANTS);
+      } catch {
+        if (!cancelled) setMerchants(FALLBACK_MERCHANTS);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const sortedMerchants = useMemo(() => {
     if (activeTab === "最快") {
-      return [...MERCHANTS].sort((a, b) => {
-        const timeA = parseInt(a.time.split("-")[0]);
-        const timeB = parseInt(b.time.split("-")[0]);
+      return [...merchants].sort((a, b) => {
+        const timeA = parseInt(a.time.split("-")[0], 10) || 10;
+        const timeB = parseInt(b.time.split("-")[0], 10) || 10;
         return timeA - timeB;
       });
     }
-    return MERCHANTS;
-  }, [activeTab]);
+    return merchants;
+  }, [merchants, activeTab]);
 
   return (
     <div className="h-full bg-gray-50 flex flex-col relative overflow-y-auto no-scrollbar pb-24">
@@ -75,6 +82,7 @@ export function OrderingTab() {
           <MerchantPage
             merchant={selectedMerchant}
             onBack={() => setSelectedMerchant(null)}
+            user={user}
             key="merchant-page"
           />
         ) : null}
@@ -153,6 +161,11 @@ export function OrderingTab() {
             </h2>
           </div>
           
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 size={32} className="animate-spin text-[#FF6B6B]" />
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {sortedMerchants.map((merchant) => (
               <motion.div 
@@ -197,6 +210,7 @@ export function OrderingTab() {
               </motion.div>
             ))}
           </div>
+          )}
         </div>
       </div>
     </div>

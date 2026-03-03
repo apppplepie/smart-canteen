@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ChevronLeft,
   Star,
@@ -7,64 +7,73 @@ import {
   Plus,
   Minus,
   ShoppingBag,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { CheckoutPage } from "./CheckoutPage";
+import { listMenuItemsByVendor } from "../api/menuItems";
+import { getBaseUrl } from "../api/client";
 
-const MENU = [
-  {
-    id: 1,
-    name: "招牌麻辣烫",
-    price: 18,
-    desc: "包含牛丸、鱼豆腐、生菜等10种配菜",
-    image: "https://picsum.photos/seed/d1/200/200",
-    popular: true,
-  },
-  {
-    id: 2,
-    name: "番茄肥牛面",
-    price: 22,
-    desc: "浓郁番茄汤底，精选肥牛卷",
-    image: "https://picsum.photos/seed/d2/200/200",
-    popular: true,
-  },
-  {
-    id: 3,
-    name: "金汤酸菜鱼",
-    price: 28,
-    desc: "酸辣开胃，无骨鱼片",
-    image: "https://picsum.photos/seed/d3/200/200",
-    popular: false,
-  },
-  {
-    id: 4,
-    name: "手撕包菜",
-    price: 12,
-    desc: "干香下饭，微辣",
-    image: "https://picsum.photos/seed/d4/200/200",
-    popular: false,
-  },
-  {
-    id: 5,
-    name: "冰镇酸梅汤",
-    price: 6,
-    desc: "解腻解辣，清凉一夏",
-    image: "https://picsum.photos/seed/d5/200/200",
-    popular: false,
-  },
+type MenuItemRow = {
+  id: number;
+  name: string;
+  price: number;
+  desc: string;
+  image: string;
+  popular: boolean;
+};
+
+const FALLBACK_MENU: MenuItemRow[] = [
+  { id: 1, name: "招牌麻辣烫", price: 18, desc: "包含牛丸、鱼豆腐、生菜等10种配菜", image: "https://picsum.photos/seed/d1/200/200", popular: true },
+  { id: 2, name: "番茄肥牛面", price: 22, desc: "浓郁番茄汤底，精选肥牛卷", image: "https://picsum.photos/seed/d2/200/200", popular: true },
+  { id: 3, name: "金汤酸菜鱼", price: 28, desc: "酸辣开胃，无骨鱼片", image: "https://picsum.photos/seed/d3/200/200", popular: false },
 ];
 
 interface MerchantPageProps {
-  merchant: any;
+  merchant: { id: number; name: string; image?: string; rating?: number; time?: string; distance?: string };
   onBack: () => void;
+  user?: { userId?: number } | null;
   key?: string;
 }
 
-export function MerchantPage({ merchant, onBack }: MerchantPageProps) {
+export function MerchantPage({ merchant, onBack, user }: MerchantPageProps) {
   const [cart, setCart] = useState<Record<number, number>>({});
   const [activeCategory, setActiveCategory] = useState("招牌");
   const [showCheckout, setShowCheckout] = useState(false);
+  const [menu, setMenu] = useState<MenuItemRow[]>(FALLBACK_MENU);
+  const [menuLoading, setMenuLoading] = useState(!!getBaseUrl());
+
+  useEffect(() => {
+    const base = getBaseUrl();
+    if (!base || !merchant?.id) {
+      setMenuLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await listMenuItemsByVendor(merchant.id);
+        if (cancelled) return;
+        const mapped: MenuItemRow[] = list
+          .filter((m) => m.isAvailable !== false)
+          .map((m) => ({
+            id: m.id,
+            name: m.name,
+            price: Number(m.price),
+            desc: m.description ?? "",
+            image: `https://picsum.photos/seed/d${m.id}/200/200`,
+            popular: false,
+          }));
+        setMenu(mapped.length ? mapped : FALLBACK_MENU);
+      } catch {
+        if (!cancelled) setMenu(FALLBACK_MENU);
+      } finally {
+        if (!cancelled) setMenuLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [merchant.id]);
 
   const updateCart = (id: number, delta: number) => {
     setCart((prev) => {
@@ -84,7 +93,7 @@ export function MerchantPage({ merchant, onBack }: MerchantPageProps) {
   ) as number;
   const totalPrice = Object.entries(cart).reduce(
     (total: number, [id, count]) => {
-      const item = MENU.find((m) => m.id === Number(id));
+      const item = menu.find((m) => m.id === Number(id));
       return total + (item?.price || 0) * (count as number);
     },
     0,
@@ -100,7 +109,7 @@ export function MerchantPage({ merchant, onBack }: MerchantPageProps) {
       {/* Header Image & Info */}
       <div className="relative h-64 md:h-80 shrink-0 w-full">
         <img
-          src={merchant.image}
+          src={merchant.image ?? `https://picsum.photos/seed/m${merchant.id}/800/400`}
           alt={merchant.name}
           className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
@@ -119,13 +128,13 @@ export function MerchantPage({ merchant, onBack }: MerchantPageProps) {
           <div className="flex items-center gap-4 text-sm md:text-base text-white/90">
             <span className="flex items-center gap-1">
               <Star size={14} className="fill-amber-400 text-amber-400" />{" "}
-              {merchant.rating}
+              {merchant.rating ?? 4.5}
             </span>
             <span className="flex items-center gap-1">
-              <Clock size={14} /> {merchant.time}
+              <Clock size={14} /> {merchant.time ?? "10-15 min"}
             </span>
             <span className="flex items-center gap-1">
-              <MapPin size={14} /> {merchant.distance}
+              <MapPin size={14} /> {merchant.distance ?? "食堂"}
             </span>
           </div>
         </div>
@@ -161,8 +170,13 @@ export function MerchantPage({ merchant, onBack }: MerchantPageProps) {
           {/* Dishes */}
           <div className="flex-1 bg-white overflow-y-auto no-scrollbar p-4 md:p-8 pb-32">
             <h2 className="font-bold text-gray-900 mb-6 text-xl">{activeCategory}</h2>
+            {menuLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 size={32} className="animate-spin text-[#FF6B6B]" />
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {MENU.map((item) => (
+              {menu.map((item) => (
                 <div
                   key={item.id}
                   className="flex gap-4 bg-white p-2 rounded-2xl hover:shadow-md transition-shadow border border-transparent hover:border-gray-100"
@@ -212,6 +226,7 @@ export function MerchantPage({ merchant, onBack }: MerchantPageProps) {
                 </div>
               ))}
             </div>
+            )}
           </div>
         </div>
       </div>
@@ -256,7 +271,8 @@ export function MerchantPage({ merchant, onBack }: MerchantPageProps) {
             cart={cart}
             totalPrice={totalPrice}
             onBack={() => setShowCheckout(false)}
-            menu={MENU}
+            menu={menu}
+            userId={user?.userId}
           />
         )}
       </AnimatePresence>

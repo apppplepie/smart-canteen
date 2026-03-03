@@ -11,8 +11,12 @@ import {
   HelpCircle,
   LogOut,
   UtensilsCrossed,
-  ShoppingBag
+  ShoppingBag,
 } from "lucide-react";
+import { listOrdersByUser } from "../api/orders";
+import { listVendors } from "../api/vendors";
+import { formatRelativeTime } from "../lib/utils";
+import { getBaseUrl } from "../api/client";
 import { motion, AnimatePresence } from "motion/react";
 import {
   AreaChart,
@@ -35,15 +39,56 @@ const data = [
   { time: "13:00", wait: 10, queue: 20 },
 ];
 
-export function ProfileTab({ onNavigate }: { onNavigate?: (tab: string) => void }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState<any>(null);
+export type ProfileUser = { name: string; id: string; avatar: string; userId?: number } | null;
+
+export interface ProfileTabProps {
+  user?: ProfileUser;
+  onLogin?: (u: ProfileUser) => void;
+  onNavigate?: (tab: string) => void;
+}
+
+export function ProfileTab({
+  user: propUser,
+  onLogin,
+  onNavigate,
+}: ProfileTabProps) {
+  const user = propUser ?? null;
+  const isLoggedIn = !!user;
   const [showLogin, setShowLogin] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showMyPosts, setShowMyPosts] = useState(false);
-  
+  const [recentOrders, setRecentOrders] = useState<{ name: string; time: string; price: string; status: string; image: string }[]>([]);
+
   // 0: 未点餐, 1: 制作中, 2: 请取餐
   const [orderStatus, setOrderStatus] = useState(0);
+
+  useEffect(() => {
+    const base = getBaseUrl();
+    const uid = user?.userId;
+    if (!base || uid == null) {
+      setRecentOrders([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [list, vendors] = await Promise.all([listOrdersByUser(uid), listVendors()]);
+        if (cancelled) return;
+        const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
+        const rows = list.slice(0, 3).map((o) => ({
+          name: vendorMap.get(o.vendorId ?? 0) ?? "订单",
+          time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
+          price: String(o.totalAmount),
+          status: o.status ?? "已完成",
+          image: `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
+        }));
+        setRecentOrders(rows);
+      } catch {
+        if (!cancelled) setRecentOrders([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.userId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -62,8 +107,7 @@ export function ProfileTab({ onNavigate }: { onNavigate?: (tab: string) => void 
 
   const handleLogout = () => {
     if (window.confirm("确定要退出登录吗？")) {
-      setIsLoggedIn(false);
-      setUser(null);
+      onLogin?.(null);
     }
   };
 
@@ -71,17 +115,19 @@ export function ProfileTab({ onNavigate }: { onNavigate?: (tab: string) => void 
     <div className="h-full bg-gray-50 flex flex-col relative overflow-y-auto no-scrollbar pb-24">
       <AnimatePresence>
         {showLogin && (
-          <LoginPage 
-            onBack={() => setShowLogin(false)} 
+          <LoginPage
+            onBack={() => setShowLogin(false)}
             onLogin={(u) => {
-              setUser(u);
-              setIsLoggedIn(true);
+              onLogin?.(u);
               setShowLogin(false);
-            }} 
+            }}
           />
         )}
         {showHistory && (
-          <HistoryOrdersPage onBack={() => setShowHistory(false)} />
+          <HistoryOrdersPage
+            onBack={() => setShowHistory(false)}
+            userId={user?.userId}
+          />
         )}
         {showMyPosts && user && (
           <MyPostsPage onBack={() => setShowMyPosts(false)} user={user} />
@@ -400,29 +446,11 @@ export function ProfileTab({ onNavigate }: { onNavigate?: (tab: string) => void 
               </div>
 
               <div className="space-y-4">
-                {[
-                  {
-                    name: "健康轻食沙拉",
-                    time: "昨天 12:30",
-                    price: "28.00",
-                    status: "已完成",
-                    image: "https://picsum.photos/seed/m2/100/100",
-                  },
-                  {
-                    name: "日式咖喱屋",
-                    time: "周二 18:15",
-                    price: "32.50",
-                    status: "已完成",
-                    image: "https://picsum.photos/seed/m4/100/100",
-                  },
-                  {
-                    name: "川香麻辣烫",
-                    time: "周一 12:00",
-                    price: "18.50",
-                    status: "已完成",
-                    image: "https://picsum.photos/seed/m1/100/100",
-                  },
-                ].map((order, i) => (
+                {(recentOrders.length ? recentOrders : [
+                  { name: "健康轻食沙拉", time: "昨天 12:30", price: "28.00", status: "已完成", image: "https://picsum.photos/seed/m2/100/100" },
+                  { name: "日式咖喱屋", time: "周二 18:15", price: "32.50", status: "已完成", image: "https://picsum.photos/seed/m4/100/100" },
+                  { name: "川香麻辣烫", time: "周一 12:00", price: "18.50", status: "已完成", image: "https://picsum.photos/seed/m1/100/100" },
+                ]).map((order, i) => (
                   <div
                     key={i}
                     className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-gray-50 hover:shadow-md transition-shadow cursor-pointer"

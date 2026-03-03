@@ -15,11 +15,12 @@ export function LoginPage({ onBack, onLogin }: LoginPageProps) {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (studentId && password) {
-      // Mock login success
+      // Mock login success; userId 用于调用后端接口（需与 backend users 表一致，默认 1）
       onLogin({
         name: "干饭王",
         id: studentId,
         avatar: "https://picsum.photos/seed/u1/100/100",
+        userId: 1,
       });
     }
   };

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Home, Compass, User, Sparkles, Store } from "lucide-react";
+import { Home, Compass, User as UserIcon, Sparkles, Store } from "lucide-react";
 import { OrderingTab } from "./components/OrderingTab";
 import { DynamicsTab } from "./components/DynamicsTab";
 import { ProfileTab } from "./components/ProfileTab";
@@ -10,13 +10,14 @@ import { AnimatePresence, motion } from "motion/react";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("ordering");
+  const [user, setUser] = useState<import("./components/ProfileTab").ProfileUser>(null);
 
   const tabs = [
     { id: "ordering", label: "点餐", icon: Home },
     { id: "dynamics", label: "动态", icon: Compass },
     { id: "assistant", label: "AI助手", icon: Sparkles, isPrimary: true },
     { id: "online", label: "在线", icon: Store },
-    { id: "profile", label: "我的", icon: User },
+    { id: "profile", label: "我的", icon: UserIcon },
   ];
 
   return (
@@ -81,11 +82,11 @@ export default function App() {
             transition={{ duration: 0.2 }}
             className="flex-1 h-full"
           >
-            {activeTab === "ordering" && <OrderingTab />}
-            {activeTab === "dynamics" && <DynamicsTab />}
+            {activeTab === "ordering" && <OrderingTab user={user} />}
+            {activeTab === "dynamics" && <DynamicsTab user={user} />}
             {activeTab === "assistant" && <AIAssistantTab />}
-            {activeTab === "online" && <CanteenOnlineTab />}
-            {activeTab === "profile" && <ProfileTab onNavigate={setActiveTab} />}
+            {activeTab === "online" && <CanteenOnlineTab user={user} />}
+            {activeTab === "profile" && <ProfileTab user={user} onLogin={setUser} onNavigate={setActiveTab} />}
           </motion.div>
         </AnimatePresence>
       </div>

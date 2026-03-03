@@ -1,138 +1,76 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Heart,
   MessageCircle,
-  Share2,
-  MoreHorizontal,
-  Plus,
   MapPin,
   ChevronLeft,
-  Send,
-  Star
+  Star,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { FloatingActionButton } from "./FloatingActionButton";
 import { PublishPage } from "./PublishPage";
 import { MerchantPage } from "./MerchantPage";
 import { THEME } from "../config/theme";
 import { cn } from "../lib/utils";
 import { SharedPostDetail } from "./SharedPostDetail";
+import { listPosts, listVendors } from "../api";
+import { postToSharedPost } from "../api/mapPost";
+import type { SharedPost } from "./SharedPostDetail";
 
-const POSTS = [
-  {
-    id: 1,
-    user: { name: "干饭王", avatar: "https://picsum.photos/seed/u1/100/100" },
-    content:
-      "今天一餐的麻辣烫太绝了！加了双份肥牛，汤底浓郁，简直是打工人的灵魂救赎 🍜✨",
-    image: "https://picsum.photos/seed/p1/400/500",
-    likes: 128,
-    comments: 32,
-    time: "2小时前",
-    height: "h-64",
-    merchantId: 1,
-    merchantName: "川香麻辣烫",
-    dishName: "自选麻辣烫",
-    isLatest: true,
-  },
-  {
-    id: 2,
-    user: {
-      name: "减脂小分队",
-      avatar: "https://picsum.photos/seed/u2/100/100",
-    },
-    content: "二楼的轻食沙拉分量好足，鸡胸肉一点都不柴，推荐搭配油醋汁🥗",
-    image: "https://picsum.photos/seed/p2/400/300",
-    likes: 89,
-    comments: 15,
-    time: "4小时前",
-    height: "h-48",
-    merchantId: 2,
-    merchantName: "健康轻食沙拉",
-    dishName: "招牌鸡胸肉沙拉",
-    isLatest: true,
-  },
-  {
-    id: 3,
-    user: { name: "碳水狂魔", avatar: "https://picsum.photos/seed/u3/100/100" },
-    content: "老北京炸酱面yyds！面条劲道，酱香浓郁，配上黄瓜丝绝了🥒",
-    image: "https://picsum.photos/seed/p3/400/400",
-    likes: 256,
-    comments: 64,
-    time: "昨天",
-    height: "h-56",
-    merchantId: 3,
-    merchantName: "老北京炸酱面",
-    dishName: "经典炸酱面",
-    isLatest: false,
-  },
-  {
-    id: 4,
-    user: { name: "甜品控", avatar: "https://picsum.photos/seed/u4/100/100" },
-    content: "食堂新出的抹茶毛巾卷，口感绵密，抹茶味超浓郁，下午茶首选🍵",
-    image: "https://picsum.photos/seed/p4/400/600",
-    likes: 412,
-    comments: 88,
-    time: "昨天",
-    height: "h-72",
-    merchantId: 4,
-    merchantName: "日式咖喱屋",
-    dishName: "抹茶毛巾卷",
-    isLatest: false,
-  },
-  {
-    id: 5,
-    user: { name: "热心同学", avatar: "https://picsum.photos/seed/u5/100/100" },
-    content: "【寻物启事】昨天中午在一楼食堂丢了一把黑色的雨伞，伞柄有划痕。有捡到的同学麻烦联系我，必有重谢！",
-    image: "https://picsum.photos/seed/umbrella/400/300",
-    likes: 12,
-    comments: 3,
-    time: "2小时前",
-    height: "h-48",
-    isLatest: true,
-    tags: ["寻物启事", "一楼东区"]
-  },
-  {
-    id: 6,
-    user: { name: "食堂大妈", avatar: "https://picsum.photos/seed/u6/100/100" },
-    content: "【失物招领】在二楼西区靠窗的桌子上捡到一张校园卡，名字叫张三，已交到二楼服务台，请失主尽快来领取。",
-    image: "https://picsum.photos/seed/card/400/300",
-    likes: 45,
-    comments: 1,
-    time: "昨天",
-    height: "h-56",
-    isLatest: false,
-    tags: ["失物招领", "二楼服务台"]
-  },
-  {
-    id: 7,
-    user: { name: "匿名用户", avatar: "https://picsum.photos/seed/anon/100/100" },
-    content: "【问题反馈】二楼靠窗的桌子有些油腻，希望能加强清理频率。环境卫生需要大家共同维护。",
-    image: "",
-    likes: 88,
-    comments: 15,
-    time: "昨天",
-    height: "h-32",
-    isLatest: false,
-    tags: ["问题反馈", "环境卫生"]
-  }
+const FALLBACK_POSTS: (SharedPost & { height?: string; isLatest?: boolean })[] = [
+  { id: 1, user: { name: "干饭王", avatar: "https://picsum.photos/seed/u1/100/100" }, content: "今天一餐的麻辣烫太绝了！加了双份肥牛，汤底浓郁，简直是打工人的灵魂救赎 🍜✨", image: "https://picsum.photos/seed/p1/400/500", likes: 128, comments: 32, time: "2小时前", height: "h-64", merchantId: 1, merchantName: "川香麻辣烫", dishName: "自选麻辣烫", isLatest: true },
+  { id: 2, user: { name: "减脂小分队", avatar: "https://picsum.photos/seed/u2/100/100" }, content: "二楼的轻食沙拉分量好足，鸡胸肉一点都不柴，推荐搭配油醋汁🥗", image: "https://picsum.photos/seed/p2/400/300", likes: 89, comments: 15, time: "4小时前", height: "h-48", merchantId: 2, merchantName: "健康轻食沙拉", dishName: "招牌鸡胸肉沙拉", isLatest: true },
+  { id: 3, user: { name: "碳水狂魔", avatar: "https://picsum.photos/seed/u3/100/100" }, content: "老北京炸酱面yyds！面条劲道，酱香浓郁，配上黄瓜丝绝了🥒", image: "https://picsum.photos/seed/p3/400/400", likes: 256, comments: 64, time: "昨天", height: "h-56", merchantId: 3, merchantName: "老北京炸酱面", dishName: "经典炸酱面", isLatest: false },
+  { id: 4, user: { name: "甜品控", avatar: "https://picsum.photos/seed/u4/100/100" }, content: "食堂新出的抹茶毛巾卷，口感绵密，抹茶味超浓郁，下午茶首选🍵", image: "https://picsum.photos/seed/p4/400/600", likes: 412, comments: 88, time: "昨天", height: "h-72", merchantId: 4, merchantName: "日式咖喱屋", dishName: "抹茶毛巾卷", isLatest: false },
+  { id: 5, user: { name: "热心同学", avatar: "https://picsum.photos/seed/u5/100/100" }, content: "【寻物启事】昨天中午在一楼食堂丢了一把黑色的雨伞，伞柄有划痕。有捡到的同学麻烦联系我，必有重谢！", image: "https://picsum.photos/seed/umbrella/400/300", likes: 12, comments: 3, time: "2小时前", height: "h-48", isLatest: true, tags: ["寻物启事", "一楼东区"] },
+  { id: 6, user: { name: "食堂大妈", avatar: "https://picsum.photos/seed/u6/100/100" }, content: "【失物招领】在二楼西区靠窗的桌子上捡到一张校园卡，名字叫张三，已交到二楼服务台，请失主尽快来领取。", image: "https://picsum.photos/seed/card/400/300", likes: 45, comments: 1, time: "昨天", height: "h-56", isLatest: false, tags: ["失物招领", "二楼服务台"] },
+  { id: 7, user: { name: "匿名用户", avatar: "https://picsum.photos/seed/anon/100/100" }, content: "【问题反馈】二楼靠窗的桌子有些油腻，希望能加强清理频率。环境卫生需要大家共同维护。", image: "", likes: 88, comments: 15, time: "昨天", height: "h-32", isLatest: false, tags: ["问题反馈", "环境卫生"] },
 ];
 
-export function DynamicsTab() {
+export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
   const [isPublishing, setIsPublishing] = useState(false);
   const [activeTab, setActiveTab] = useState<"推荐" | "最新">("推荐");
-  const [selectedPost, setSelectedPost] = useState<any>(null);
+  const [selectedPost, setSelectedPost] = useState<SharedPost | null>(null);
   const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
-
+  const [posts, setPosts] = useState<SharedPost[]>(FALLBACK_POSTS);
+  const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
 
-  const filteredPosts = useMemo(() => {
-    if (activeTab === "最新") {
-      return POSTS.filter(p => p.isLatest);
-    }
-    return POSTS;
-  }, [activeTab]);
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
-  const renderPost = (post: any) => (
+  const fetchPosts = React.useCallback(async () => {
+    if (!baseUrl) return;
+    try {
+      const [postList, vendorList] = await Promise.all([listPosts(), listVendors()]);
+      const vendorMap = new Map(vendorList.map((v) => [v.id, v.name]));
+      const mapped = postList.map((p) => postToSharedPost(p, vendorMap.get(p.vendorId ?? 0)));
+      setPosts(mapped);
+    } catch {
+      setPosts(FALLBACK_POSTS);
+    }
+  }, [baseUrl]);
+
+  useEffect(() => {
+    if (!baseUrl) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      await fetchPosts();
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [baseUrl, fetchPosts]);
+
+  const filteredPosts = useMemo(() => {
+    const list = posts as (SharedPost & { isLatest?: boolean })[];
+    if (activeTab === "最新") return list.filter((p) => p.isLatest !== false);
+    return list;
+  }, [posts, activeTab]);
+
+  const renderPost = (post: SharedPost & { height?: string }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -144,7 +82,7 @@ export function DynamicsTab() {
         <img
           src={post.image}
           alt="Post"
-          className={`w-full object-cover ${post.height}`}
+          className={`w-full object-cover ${(post as { height?: string }).height ?? "h-48"}`}
           referrerPolicy="no-referrer"
         />
       )}
@@ -152,10 +90,10 @@ export function DynamicsTab() {
         {post.merchantName && (
           <div className="flex items-center gap-1 text-[10px] text-[#FF6B6B] bg-red-50 w-fit px-2 py-1 rounded-md mb-2">
             <MapPin size={10} />
-            <span>{post.merchantName} · {post.dishName}</span>
+            <span>{post.merchantName}{post.dishName ? ` · ${post.dishName}` : ""}</span>
           </div>
         )}
-        {post.tags && (
+        {post.tags && post.tags.length > 0 && (
           <div className="flex gap-2 mb-2">
             {post.tags.map((tag: string) => (
               <span key={tag} className={cn("text-[10px] px-2 py-1 rounded-md font-bold", tag === "寻物启事" ? "bg-orange-50 text-orange-500" : tag === "失物招领" ? "bg-blue-50 text-blue-500" : tag === "问题反馈" ? "bg-red-50 text-[#FF6B6B]" : "bg-gray-50 text-gray-500")}>
@@ -170,21 +108,18 @@ export function DynamicsTab() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img
-              src={post.user.avatar}
-              alt={post.user.name}
+              src={post.user?.avatar ?? "https://api.dicebear.com/7.x/avataaars/svg?seed=u"}
+              alt={post.user?.name ?? "用户"}
               className="w-6 h-6 rounded-full"
               referrerPolicy="no-referrer"
             />
             <span className="text-xs text-gray-500 font-medium">
-              {post.user.name}
+              {post.user?.name ?? "用户"}
             </span>
           </div>
           <div className="flex items-center gap-1 text-gray-400">
-            <Heart
-              size={14}
-              className="hover:text-red-500 cursor-pointer transition-colors"
-            />
-            <span className="text-xs">{post.likes}</span>
+            <Heart size={14} className="hover:text-red-500 cursor-pointer transition-colors" />
+            <span className="text-xs">{post.likes ?? 0}</span>
           </div>
         </div>
       </div>
@@ -196,7 +131,7 @@ export function DynamicsTab() {
       <AnimatePresence>
         {selectedMerchantId ? (
           <MerchantPage
-            merchant={{ id: selectedMerchantId, name: POSTS.find(p => p.merchantId === selectedMerchantId)?.merchantName }}
+            merchant={{ id: selectedMerchantId, name: posts.find((p) => p.merchantId === selectedMerchantId)?.merchantName ?? "商家" }}
             onBack={() => setSelectedMerchantId(null)}
             key="merchant-page"
           />
@@ -214,14 +149,16 @@ export function DynamicsTab() {
               </button>
               <span className="font-bold ml-2">帖子详情</span>
             </div>
-            <SharedPostDetail 
-              post={selectedPost} 
-              onMerchantClick={(id) => setSelectedMerchantId(id)} 
+            <SharedPostDetail
+              post={selectedPost}
+              onMerchantClick={(id) => setSelectedMerchantId(id)}
             />
           </motion.div>
         ) : isPublishing ? (
           <PublishPage
             onBack={() => setIsPublishing(false)}
+            onSuccess={() => fetchPosts()}
+            currentUserId={user?.userId}
             key="publish-page"
           />
         ) : null}
@@ -308,9 +245,15 @@ export function DynamicsTab() {
         </div>
 
         {/* Waterfall Layout */}
-        <div className="columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
-          {filteredPosts.map(renderPost)}
-        </div>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 size={32} className="animate-spin text-[#FF6B6B]" />
+          </div>
+        ) : (
+          <div className="columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
+            {filteredPosts.map(renderPost)}
+          </div>
+        )}
       </div>
     </div>
   );
