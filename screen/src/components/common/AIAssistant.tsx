@@ -2,20 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Send, Sparkles, Loader2 } from 'lucide-react';
 
+import { getApiBaseUrl } from '../../api/client';
 import { aiAssistantMenuContext, aiAssistantInitialMessage } from '../../mocks/aiAssistant';
-
-const DEEPSEEK_API = 'https://api.deepseek.com/v1/chat/completions';
-
-function getApiKey(): string | null {
-  const key = process.env.DEEPSEEK_API_KEY;
-  return key && key !== '' ? key : null;
-}
 
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([
     aiAssistantInitialMessage,
   ]);
+  const [conversationId, setConversationId] = useState<number | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -36,50 +31,65 @@ export function AIAssistant() {
     setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setIsLoading(true);
 
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      setMessages(prev => [...prev, { role: 'ai', text: '请先在 screen 目录下配置 .env 中的 DEEPSEEK_API_KEY 后重启开发服务器。' }]);
+    const baseUrl = getApiBaseUrl();
+    if (!baseUrl) {
+      setMessages(prev => [
+        ...prev,
+        { role: 'ai', text: '请配置 .env 中的 VITE_API_BASE_URL（Spring Boot 地址）后重启开发服务器。' },
+      ]);
       setIsLoading(false);
       return;
     }
 
-    try {
-      const history = messages.map(m => ({
-        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-        content: m.text,
-      }));
-      const systemPrompt = `你是一个大学食堂的AI助手，负责给学生推荐菜品、回答关于食堂的问题。请保持热情、友好、活泼的语气。
+    const systemPrompt = `你是一个大学食堂的AI助手，负责给学生推荐菜品、回答关于食堂的问题。请保持热情、友好、活泼的语气。
 
 以下是今日的菜单信息：
 ${aiAssistantMenuContext}
 
 请根据以上信息给出回答。如果学生问的问题与食堂无关，请委婉地引导回食堂的话题。`;
 
-      const res = await fetch(DEEPSEEK_API, {
+    const apiMessages: { role: string; content: string }[] = [
+      { role: 'system', content: systemPrompt },
+      ...messages.map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text,
+      })),
+      { role: 'user', content: userMessage },
+    ];
+
+    const body: { messages: typeof apiMessages; conversationId?: number | null } = {
+      messages: apiMessages,
+    };
+    if (conversationId != null) body.conversationId = conversationId;
+
+    try {
+      const res = await fetch(`${baseUrl}/api/ai/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...history,
-            { role: 'user', content: userMessage },
-          ],
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
 
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err || `HTTP ${res.status}`);
+      const raw = await res.text();
+      let data: { code?: number; data?: { content?: string; conversationId?: number }; message?: string; content?: string };
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {};
       }
+      const content =
+        (data?.data?.content ?? data?.content ?? '').trim() || '抱歉，我暂时无法回答这个问题。';
+      const newConvId = data?.data?.conversationId;
+      const isError = !res.ok || (data?.code !== undefined && data?.code !== 0);
 
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content?.trim();
-
-      setMessages(prev => [...prev, { role: 'ai', text: content || '抱歉，我暂时无法回答这个问题。' }]);
+      if (isError) {
+        setMessages(prev => [
+          ...prev,
+          { role: 'ai', text: data?.message || '网络似乎有点问题，请稍后再试哦~' },
+        ]);
+      } else {
+        setMessages(prev => [...prev, { role: 'ai', text: content }]);
+        if (newConvId != null) setConversationId(newConvId);
+      }
     } catch (error) {
       console.error('AI Error:', error);
       setMessages(prev => [...prev, { role: 'ai', text: '网络似乎有点问题，请稍后再试哦~' }]);

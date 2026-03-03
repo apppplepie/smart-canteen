@@ -1,16 +1,19 @@
 <script lang="ts" setup>
 import { Delete, Promotion } from "@element-plus/icons-vue"
 
+const CHAT_API_BASE = (import.meta.env.VITE_CHAT_API_BASE_URL as string) || "http://localhost:8081"
+
 interface Message {
   role: "user" | "assistant"
   content: string
 }
 
 const messages = ref<Message[]>([])
+const conversationId = ref<number | null>(null)
 const input = ref("")
 const isLoading = ref(false)
 const messagesContainerRef = ref<HTMLElement>()
-const textareaRef = ref<InstanceType<typeof ElInput>>()
+const textareaRef = ref<HTMLElement>()
 
 function scrollToBottom() {
   nextTick(() => {
@@ -33,60 +36,47 @@ async function sendMessage() {
   const lastIndex = messages.value.length - 1
 
   try {
-    const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY as string
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
+    const apiMessages = messages.value
+      .slice(0, -1)
+      .map(({ role, content: c }) => ({ role, content: c }))
+    const body: { messages: typeof apiMessages; conversationId?: number | null } = { messages: apiMessages }
+    if (conversationId.value != null) body.conversationId = conversationId.value
+
+    const response = await fetch(`${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/chat`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: messages.value
-          .slice(0, -1)
-          .map(({ role, content: c }) => ({ role, content: c })),
-        stream: true
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
     })
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    if (!response.body) throw new Error("No response body")
+    const raw = await response.text()
+    let data: { code?: number; data?: { content?: string; conversationId?: number }; message?: string }
+    try {
+      data = raw ? JSON.parse(raw) : {}
+    } catch {
+      data = {}
+    }
 
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      const chunk = decoder.decode(value, { stream: true })
-      for (const line of chunk.split("\n")) {
-        if (!line.startsWith("data: ")) continue
-        const data = line.slice(6)
-        if (data === "[DONE]") continue
-        try {
-          const json = JSON.parse(data)
-          const delta = json.choices?.[0]?.delta?.content
-          if (delta) {
-            messages.value[lastIndex].content += delta
-            scrollToBottom()
-          }
-        } catch {
-          // 忽略非 JSON 行
-        }
-      }
+    const isError = !response.ok || (data?.code !== undefined && data?.code !== 0)
+    if (isError) {
+      messages.value[lastIndex].content = data?.message || "请求失败，请检查网络或后端服务后重试。"
+      ElMessage.error("发送失败")
+    } else {
+      const text = (data?.data?.content ?? "").trim() || "抱歉，我暂时无法回答这个问题。"
+      messages.value[lastIndex].content = text
+      if (data?.data?.conversationId != null) conversationId.value = data.data.conversationId
     }
   } catch {
-    messages.value[lastIndex].content = "请求失败，请检查网络或 API Key 后重试。"
+    messages.value[lastIndex].content = "请求失败，请检查网络或后端服务后重试。"
     ElMessage.error("发送失败")
   } finally {
     isLoading.value = false
   }
 }
 
-function handleKeydown(e: KeyboardEvent) {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault()
+function handleKeydown(e: KeyboardEvent | Event) {
+  const ev = e as KeyboardEvent
+  if (ev.key === "Enter" && !ev.shiftKey) {
+    ev.preventDefault()
     sendMessage()
   }
 }
@@ -98,6 +88,7 @@ function clearMessages() {
     type: "warning"
   }).then(() => {
     messages.value = []
+    conversationId.value = null
   })
 }
 
@@ -118,7 +109,7 @@ function renderContent(content: string): string {
     <!-- 顶部标题栏 -->
     <div class="chat-header">
       <span class="chat-title">AI 助手</span>
-      <span class="chat-subtitle">由 DeepSeek 驱动</span>
+      <span class="chat-subtitle">Spring Boot 转发 · 对话落库</span>
       <el-button
         v-if="messages.length > 0"
         :icon="Delete"
