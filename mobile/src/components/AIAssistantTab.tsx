@@ -99,8 +99,12 @@ export function AIAssistantTab() {
 
     try {
       if (!API_BASE_URL) {
+        console.warn("VITE_API_BASE_URL 为空，请检查 .env 并重启前端 dev (npm run dev)");
         throw new Error("未配置 VITE_API_BASE_URL，请在 .env 中设置后端地址");
       }
+
+      const url = `${API_BASE_URL}/api/ai/chat`;
+      console.log("AI 请求:", "POST", url);
 
       const systemContent = `你是一个大学食堂的智能点餐助手。你的语气应该活泼、友好、像个懂吃的朋友。
 食堂目前有以下档口：
@@ -117,19 +121,26 @@ export function AIAssistantTab() {
         { role: "user", content: text },
       ];
 
-      const res = await fetch(`${API_BASE_URL}/api/ai/chat`, {
+      // 请求走 Spring Boot，由后端转调 FastAPI ai-service（DeepSeek）
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: apiMessages }),
       });
 
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { code?: number; data?: { content?: string }; message?: string; content?: string };
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error(`响应不是 JSON，状态 ${res.status}，内容: ${raw.slice(0, 200)}`);
+      }
       const content =
         (data?.data?.content ?? data?.content ?? "").trim() ||
-        "抱歉，我刚才走神了，能再说一遍吗？";
+        "前端取到了空值";
 
       if (!res.ok) {
-        throw new Error(data?.message ?? `请求失败 ${res.status}`);
+        throw new Error(data?.message ?? data?.content ?? `请求失败 ${res.status}`);
       }
 
       const aiMsg: Message = {

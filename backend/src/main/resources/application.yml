@@ -1,5 +1,5 @@
 server:
-  port: 8081  # 若 8080 被占用可改用 8081；改回 8080 需先关闭占用该端口的进程
+  port: 8081  # 8080 被占用且无权限结束时用 8081，前端 .env 填 http://localhost:8081
 
 # AI 服务（FastAPI）地址，供 /api/ai/chat 转调
 ai:
