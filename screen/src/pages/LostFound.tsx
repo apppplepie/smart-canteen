@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PageContainer } from '../components/common/PageContainer';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, MapPin, Bell, Clock, ChevronLeft, ChevronRight, Sparkles, CheckCircle2 } from 'lucide-react';
-import { foundItems, lostItems } from '../mocks/lostFound';
+import { useLostFound, type FoundDisplayItem, type LostDisplayItem } from '../hooks/useBackendData';
 
 // --- Subcomponents ---
 const Marquee = () => {
@@ -30,30 +30,43 @@ const Marquee = () => {
   );
 };
 
-const FoundCarousel = () => {
+const FoundCarousel = ({ items }: { items: FoundDisplayItem[] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const len = items.length || 1;
+  const safeIndex = len ? currentIndex % len : 0;
+  const current = items[safeIndex];
 
   useEffect(() => {
+    if (len <= 1) return;
     const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % foundItems.length);
+      setCurrentIndex((prev) => (prev + 1) % len);
     }, 4000);
     return () => clearInterval(timer);
-  }, []);
+  }, [len]);
 
   const handleSwipe = (direction: number) => {
+    if (len <= 1) return;
     if (direction > 0) {
-      setCurrentIndex((prev) => (prev + 1) % foundItems.length);
+      setCurrentIndex((prev) => (prev + 1) % len);
     } else {
-      setCurrentIndex((prev) => (prev - 1 + foundItems.length) % foundItems.length);
+      setCurrentIndex((prev) => (prev - 1 + len) % len);
     }
   };
+
+  if (!current) {
+    return (
+      <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10 flex items-center justify-center bg-white/5">
+        <p className="text-slate-400 text-sm">暂无招领信息</p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.4)] group border border-white/10">
       <AnimatePresence initial={false} mode="wait">
         <motion.img
           key={currentIndex}
-          src={foundItems[currentIndex].img}
+          src={current.img}
           alt="Found Item"
           className="absolute inset-0 w-full h-full object-cover"
           initial={{ opacity: 0, scale: 1.05 }}
@@ -86,14 +99,14 @@ const FoundCarousel = () => {
           失物招领
         </div>
         <h3 className="text-2xl md:text-3xl font-black text-white mb-2 tracking-wide drop-shadow-lg">
-          {foundItems[currentIndex].title}
+          {current.title}
         </h3>
         <div className="flex items-center gap-2 text-cyan-400 font-medium mb-3">
           <MapPin className="w-4 h-4" />
-          <span>{foundItems[currentIndex].location}</span>
+          <span>{current.location}</span>
         </div>
         <p className="text-slate-300 text-sm leading-relaxed max-w-md">
-          {foundItems[currentIndex].desc}
+          {current.desc}
         </p>
       </motion.div>
 
@@ -117,12 +130,12 @@ const FoundCarousel = () => {
 
       {/* Indicators */}
       <div className="absolute top-6 right-6 flex gap-2">
-        {foundItems.map((_, idx) => (
+        {items.map((_, idx) => (
           <button
             key={idx}
             onClick={() => setCurrentIndex(idx)}
             className={`h-1.5 rounded-full transition-all duration-300 ${
-              idx === currentIndex ? 'w-6 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]' : 'w-1.5 bg-white/40'
+              idx === safeIndex ? 'w-6 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]' : 'w-1.5 bg-white/40'
             }`}
           />
         ))}
@@ -131,7 +144,7 @@ const FoundCarousel = () => {
   );
 };
 
-const ScrollingLostItems = () => {
+const ScrollingLostItems = ({ items }: { items: LostDisplayItem[] }) => {
   return (
     <div className="relative flex-1 overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm p-4">
       <style>{`
@@ -152,7 +165,7 @@ const ScrollingLostItems = () => {
       <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-slate-950 to-transparent z-10 pointer-events-none" />
       
       <div className="animate-scroll-y flex flex-col gap-4 pt-4">
-        {[...lostItems, ...lostItems].map((item, idx) => (
+        {[...items, ...items].map((item, idx) => (
           <div key={`${item.id}-${idx}`} className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-5 transition-colors group cursor-pointer">
             <div className="flex justify-between items-start mb-3">
               <div className="flex items-center gap-3">
@@ -190,6 +203,7 @@ const ScrollingLostItems = () => {
 
 // --- Main Component ---
 export default function LostFound() {
+  const { foundItems, lostItems, loading } = useLostFound();
   return (
     <PageContainer>
       {/* Changed h-[calc...] to min-h-[calc...] to allow expansion on smaller screens */}
@@ -214,7 +228,7 @@ export default function LostFound() {
                 发布寻物
               </button>
             </div>
-            <ScrollingLostItems />
+            <ScrollingLostItems items={lostItems} />
           </div>
 
           {/* Right Column: Found Items Carousel */}
@@ -229,7 +243,7 @@ export default function LostFound() {
               </button>
             </div>
             <div className="flex-1 min-h-0">
-              <FoundCarousel />
+              <FoundCarousel items={foundItems} />
             </div>
           </div>
 

@@ -199,6 +199,8 @@ CREATE TABLE `posts`  (
   `media_urls` json NULL,
   `like_count` int NULL DEFAULT 0,
   `comment_count` int NULL DEFAULT 0,
+  `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'pending' COMMENT 'pending=待处理, replied=已回复',
+  `reply_content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '管理员回复内容',
   `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_posts_user`(`user_id` ASC) USING BTREE,
@@ -373,5 +375,36 @@ ALTER TABLE `stock_movements`
   ADD COLUMN `material_id` bigint NULL DEFAULT NULL COMMENT '关联食材主数据，与 material 可并存过渡' AFTER `material`,
   ADD INDEX `idx_stock_material`(`material_id` ASC) USING BTREE,
   ADD CONSTRAINT `stock_movements_ibfk_2` FOREIGN KEY (`material_id`) REFERENCES `materials` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT;
+
+-- ----------------------------
+-- Table structure for found_items（捡到失物公示，寻物平台「招领」）
+-- ----------------------------
+DROP TABLE IF EXISTS `found_items`;
+CREATE TABLE `found_items` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `title` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '标题，如 捡到黑色保温杯',
+  `location` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '捡到地点',
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '描述',
+  `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '图片URL',
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '捡到失物公示' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for lost_items（遗失登记，寻物平台「寻物」）
+-- ----------------------------
+DROP TABLE IF EXISTS `lost_items`;
+CREATE TABLE `lost_items` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '登记人称呼，如 王同学、匿名同学',
+  `user_id` bigint NULL DEFAULT NULL COMMENT '可选：关联用户',
+  `item_name` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '遗失物品名称',
+  `location` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '遗失地点',
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '补充描述',
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_lost_created`(`created_at` DESC) USING BTREE,
+  CONSTRAINT `lost_items_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '遗失登记' ROW_FORMAT = Dynamic;
 
 SET FOREIGN_KEY_CHECKS = 1;

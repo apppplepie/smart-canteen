@@ -18,6 +18,8 @@ export type {
   VendorDto,
   MenuItemDto,
   PostDto,
+  FoundItemDto,
+  LostItemDto,
   OrderDto,
   OrderItemDto,
   QueueEntryDto,

@@ -45,6 +45,12 @@ public class Post {
     @Column(name = "comment_count", nullable = false)
     private Integer commentCount = 0;
 
+    @Column(length = 32)
+    private String status = "pending";
+
+    @Column(name = "reply_content", columnDefinition = "TEXT")
+    private String replyContent;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -71,6 +77,10 @@ public class Post {
     public void setLikeCount(Integer likeCount) { this.likeCount = likeCount; }
     public Integer getCommentCount() { return commentCount; }
     public void setCommentCount(Integer commentCount) { this.commentCount = commentCount; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getReplyContent() { return replyContent; }
+    public void setReplyContent(String replyContent) { this.replyContent = replyContent; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Long getUserId() { return userId != null ? userId : (user != null ? user.getId() : null); }

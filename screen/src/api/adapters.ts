@@ -2,7 +2,7 @@
  * 将后端 DTO 转成前端页面使用的结构
  */
 import type { Dish } from '../components/menu/DishCardModal';
-import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto } from '@scs/api';
+import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto, FoundItemDto, LostItemDto } from '@scs/api';
 import { getApiBaseUrl } from '@scs/api';
 
 const defaultImage = (id: number) => `https://picsum.photos/seed/dish${id}/600/800`;
@@ -145,7 +145,59 @@ function formatTime(iso: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** Post -> 留言墙一项（部分字段后端无则用默认） */
+/** FoundItemDto[] -> 寻物页招领展示（img 相对路径会拼 baseURL） */
+export function foundItemsToDisplay(items: FoundItemDto[]): Array<{ id: number; title: string; location: string; desc: string; img: string }> {
+  return items.map((f) => ({
+    id: f.id,
+    title: f.title ?? '',
+    location: f.location ?? '',
+    desc: f.description ?? '',
+    img: f.imageUrl?.trim() ? resolveImageUrl(f.imageUrl) : `https://picsum.photos/seed/found${f.id}/800/600`,
+  }));
+}
+
+const LOST_AVATAR_COLORS = [
+  'from-rose-400 to-red-500',
+  'from-purple-400 to-pink-500',
+  'from-emerald-400 to-teal-500',
+  'from-amber-400 to-orange-500',
+  'from-blue-400 to-cyan-500',
+];
+
+function formatLostTime(iso: string | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHour = Math.floor(diffMs / 3600000);
+  const diffDay = Math.floor(diffMs / 86400000);
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  if (diffHour < 24) return `${diffHour}小时前`;
+  if (diffDay === 1) return `昨天 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (diffDay < 7) return `${diffDay}天前`;
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+/** LostItemDto[] -> 寻物页寻物展示（avatar/color/time 由后端数据推导） */
+export function lostItemsToDisplay(items: LostItemDto[]): Array<{ id: number; user: string; avatar: string; color: string; time: string; item: string; location: string; desc: string }> {
+  return items.map((l, i) => {
+    const name = l.userName?.trim() || '匿名';
+    const avatar = name.charAt(0).toUpperCase();
+    return {
+      id: l.id,
+      user: name,
+      avatar: avatar || '?',
+      color: LOST_AVATAR_COLORS[i % LOST_AVATAR_COLORS.length],
+      time: formatLostTime(l.createdAt),
+      item: l.itemName ?? '',
+      location: l.location ?? '',
+      desc: l.description ?? '',
+    };
+  });
+}
+
+/** Post -> 留言墙一项（优先 status/replyContent，无则用 commentCount 推断） */
 export function postToFeedbackItem(p: PostDto, index: number): {
   id: number;
   type: string;
@@ -157,13 +209,14 @@ export function postToFeedbackItem(p: PostDto, index: number): {
 } {
   const themes: ('cyan' | 'emerald' | 'violet' | 'amber')[] = ['cyan', 'emerald', 'violet', 'amber'];
   const created = p.createdAt ? new Date(p.createdAt).toLocaleString('zh-CN') : '';
+  const replied = p.status === 'replied' || (p.commentCount != null && p.commentCount > 0);
   return {
     id: p.id,
     type: p.title ?? '其他',
     time: created,
     content: p.content ?? '',
-    reply: p.commentCount && p.commentCount > 0 ? '已收到反馈，感谢您的留言。' : null,
-    status: (p.commentCount && p.commentCount > 0 ? 'replied' : 'pending') as 'replied' | 'pending',
+    reply: p.replyContent ?? (replied ? '已收到反馈，感谢您的留言。' : null),
+    status: (replied ? 'replied' : 'pending') as 'replied' | 'pending',
     theme: themes[index % themes.length],
   };
 }

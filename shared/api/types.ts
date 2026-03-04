@@ -53,6 +53,27 @@ export interface PostDto {
   mediaUrls?: string;
   likeCount?: number;
   commentCount?: number;
+  status?: string;
+  replyContent?: string;
+  createdAt?: string;
+}
+
+export interface FoundItemDto {
+  id: number;
+  title: string;
+  location?: string;
+  description?: string;
+  imageUrl?: string;
+  createdAt?: string;
+}
+
+export interface LostItemDto {
+  id: number;
+  userName?: string;
+  userId?: number;
+  itemName: string;
+  location?: string;
+  description?: string;
   createdAt?: string;
 }
 

@@ -219,7 +219,7 @@ export default function FoodSafety() {
           100% { transform: translateY(-50%); }
         }
         .animate-scroll-y {
-          animation: scroll-y 20s linear infinite;
+          animation: scroll-y 35s linear infinite;
         }
         .animate-scroll-y:hover {
           animation-play-state: paused;
@@ -311,9 +311,19 @@ export default function FoodSafety() {
                 <YAxis yAxisId="right" orientation="right" domain={[100, 250]} stroke="#06b6d4" fontSize={12} tickLine={false} axisLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }} />
                 
-                {/* Target Bands */}
-                <ReferenceArea yAxisId="left" y1={2} y2={8} />
-                <ReferenceArea yAxisId="right" y1={150} y2={200} />
+                {/* Target Bands (fill/stroke passed for styling; recharts Props type omits them) */}
+                <ReferenceArea
+                  yAxisId="left"
+                  y1={2}
+                  y2={8}
+                  {...({ fill: 'rgba(16, 185, 129, 0.2)', stroke: 'rgba(16, 185, 129, 0.5)', strokeDasharray: '3 3' } as Record<string, unknown>)}
+                />
+                <ReferenceArea
+                  yAxisId="right"
+                  y1={150}
+                  y2={200}
+                  {...({ fill: 'rgba(6, 182, 212, 0.2)', stroke: 'rgba(6, 182, 212, 0.5)', strokeDasharray: '3 3' } as Record<string, unknown>)}
+                />
                 
                 <Line yAxisId="left" type="monotone" dataKey="temp" name="冷柜温度" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} filter="url(#glow-line-temp)" />
                 <Line yAxisId="right" type="monotone" dataKey="ppm" name="消毒液浓度" stroke="#06b6d4" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#06b6d4', stroke: '#fff', strokeWidth: 2 }} filter="url(#glow-line-ppm)" />
@@ -372,55 +382,47 @@ export default function FoodSafety() {
             </div>
           </motion.div>
 
-          {/* Allergen Tags (Scrolling) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col h-[400px]"
-          >
-            <div className="flex justify-between items-center mb-6 shrink-0">
-              <h2 className="text-xl font-black text-white flex items-center gap-2">
-                <AlertTriangle className="text-amber-400 w-6 h-6" />
-                今日过敏原公示
-              </h2>
-            </div>
-            
-            <div className="flex-1 overflow-hidden relative mb-4">
-              {/* Gradient masks for smooth fade */}
-              <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-slate-900/80 to-transparent z-10 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-900/80 to-transparent z-10 pointer-events-none" />
-              
-              <div className="animate-scroll-y flex flex-col gap-4 pt-2">
-                {[...allergens, ...allergens].map((item, idx) => (
-                  <div key={idx} className="bg-black/20 border border-white/5 rounded-2xl p-5">
-                    <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-                      <Store className="w-4 h-4 text-slate-400" />
-                      {item.window}
-                    </h3>
-                    <div className="flex flex-wrap gap-3">
-                      {item.tags.map((tag, tIdx) => {
-                        const Icon = tag.icon;
-                        return (
-                          <div key={tIdx} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${tag.color} shadow-sm`}>
-                            <Icon className="w-4 h-4" />
-                            <span className="text-sm font-bold">{tag.name}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+          {/* 有过敏原数据时才展示今日过敏原公示 */}
+          {allergens.some((item) => item.tags?.length > 0) && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col h-[400px]"
+            >
+              <div className="flex justify-between items-center mb-6 shrink-0">
+                <h2 className="text-xl font-black text-white flex items-center gap-2">
+                  <AlertTriangle className="text-amber-400 w-6 h-6" />
+                  今日过敏原公示
+                </h2>
               </div>
-            </div>
-{/* 
-            <div className="shrink-0 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
-              <p className="text-xs text-blue-300 leading-relaxed flex items-start gap-2">
-                <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                温馨提示：食堂已要求各窗口严格区分加工器具。如您有严重食物过敏史，请在点餐前再次向工作人员确认。
-              </p>
-            </div> */}
-          </motion.div>
+              <div className="flex-1 overflow-hidden relative mb-4">
+                <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-slate-900/80 to-transparent z-10 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-900/80 to-transparent z-10 pointer-events-none" />
+                <div className="animate-scroll-y flex flex-col gap-4 pt-2">
+                  {[...allergens.filter((item) => item.tags?.length > 0), ...allergens.filter((item) => item.tags?.length > 0)].map((item, idx) => (
+                    <div key={`${item.window}-${idx}`} className="bg-black/20 border border-white/5 rounded-2xl p-5">
+                      <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+                        <Store className="w-4 h-4 text-slate-400" />
+                        {item.window}
+                      </h3>
+                      <div className="flex flex-wrap gap-3">
+                        {item.tags.map((tag, tIdx) => {
+                          const Icon = tag.icon;
+                          return (
+                            <div key={tIdx} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${tag.color} shadow-sm`}>
+                              <Icon className="w-4 h-4" />
+                              <span className="text-sm font-bold">{tag.name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
 
         </div>
       </div>

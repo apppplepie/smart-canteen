@@ -3,7 +3,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { apiGet, isApiConfigured } from '../api';
-import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto, AllergenDisclosureDto } from '../api/types';
+import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto, AllergenDisclosureDto, FoundItemDto, LostItemDto } from '../api/types';
 import {
   menuItemsToDishes,
   buildDashboardWindow,
@@ -11,6 +11,8 @@ import {
   retainedSampleToDisplay,
   sensorLogsToTimeSeries,
   postToFeedbackItem,
+  foundItemsToDisplay,
+  lostItemsToDisplay,
 } from '../api/adapters';
 import type { Dish } from '../components/menu/DishCardModal';
 import { menuCategories, mockDishes } from '../mocks/menu';
@@ -18,6 +20,7 @@ import { statusConfig, initialJustServed, initialWaiting, generateInitialWindows
 import { generateTempData } from '../mocks/foodSafety';
 import { foodSafetyReports, foodSafetySamples, foodSafetyAllergens, allergenDisclosuresToDisplay } from '../mocks/foodSafety';
 import { barData, latestFeedbacks } from '../mocks/feedback';
+import { foundItems as mockFoundItems, lostItems as mockLostItems } from '../mocks/lostFound';
 
 // ---------- Menu ----------
 export function useMenu(): {
@@ -258,4 +261,57 @@ export function useFeedback(): {
     error,
     isFromApi,
   };
+}
+
+// ---------- LostFound（寻物/招领） ----------
+export type FoundDisplayItem = ReturnType<typeof foundItemsToDisplay>[number];
+export type LostDisplayItem = ReturnType<typeof lostItemsToDisplay>[number];
+
+export function useLostFound(): {
+  foundItems: FoundDisplayItem[];
+  lostItems: LostDisplayItem[];
+  loading: boolean;
+  error: string | null;
+  isFromApi: boolean;
+} {
+  const [foundItems, setFoundItems] = useState<FoundDisplayItem[]>(mockFoundItems);
+  const [lostItems, setLostItems] = useState<LostDisplayItem[]>(mockLostItems);
+  const [loading, setLoading] = useState(isApiConfigured());
+  const [error, setError] = useState<string | null>(null);
+  const [isFromApi, setIsFromApi] = useState(false);
+
+  useEffect(() => {
+    if (!isApiConfigured()) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      apiGet<FoundItemDto[]>('/api/found-items').catch(() => []),
+      apiGet<LostItemDto[]>('/api/lost-items').catch(() => []),
+    ])
+      .then(([found, lost]) => {
+        if (cancelled) return;
+        if (found.length > 0) {
+          setFoundItems(foundItemsToDisplay(found));
+          setIsFromApi(true);
+        }
+        if (lost.length > 0) {
+          setLostItems(lostItemsToDisplay(lost));
+          setIsFromApi(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { foundItems, lostItems, loading, error, isFromApi };
 }

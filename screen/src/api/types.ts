@@ -9,4 +9,6 @@ export type {
   PostDto,
   CallEventDto,
   AllergenDisclosureDto,
+  FoundItemDto,
+  LostItemDto,
 } from "@scs/api";
