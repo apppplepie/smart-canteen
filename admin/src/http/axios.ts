@@ -4,6 +4,12 @@ import axios from "axios"
 import { get, merge } from "lodash-es"
 import { useUserStore } from "@/pinia/stores/user"
 
+/** 是否为登录接口（该接口 401 时只提示错误，不执行登出刷新） */
+function isLoginRequest(config: { url?: string }) {
+  const url = config?.url ?? ""
+  return url === "auth/login" || url.includes("auth/login")
+}
+
 /** 退出登录并强制刷新页面（会重定向到登录页） */
 function logout() {
   useUserStore().logout()
@@ -41,8 +47,12 @@ function createInstance() {
           // 本系统采用 code === 0 来表示没有业务错误
           return apiData
         case 401:
-          // Token 过期时
-          return logout()
+          // 登录接口 401 只提示错误，不登出；其他接口 Token 过期则登出
+          if (!isLoginRequest(response.config)) {
+            return logout()
+          }
+          ElMessage.error(apiData.message || "用户名或密码错误")
+          return Promise.reject(new Error(apiData.message || "用户名或密码错误"))
         default:
           // 不是正确的 code
           ElMessage.error(apiData.message || "Error")
@@ -58,9 +68,11 @@ function createInstance() {
           error.message = "请求错误"
           break
         case 401:
-          // Token 过期时
           error.message = message || "未授权"
-          logout()
+          // 登录接口 401 只提示错误，不登出刷新
+          if (!isLoginRequest(error.config ?? {})) {
+            logout()
+          }
           break
         case 403:
           error.message = message || "拒绝访问"

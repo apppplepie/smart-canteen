@@ -84,7 +84,7 @@ export default function App() {
           >
             {activeTab === "ordering" && <OrderingTab user={user} />}
             {activeTab === "dynamics" && <DynamicsTab user={user} />}
-            {activeTab === "assistant" && <AIAssistantTab />}
+            {activeTab === "assistant" && <AIAssistantTab user={user ?? undefined} />}
             {activeTab === "online" && <CanteenOnlineTab user={user} />}
             {activeTab === "profile" && <ProfileTab user={user} onLogin={setUser} onNavigate={setActiveTab} />}
           </motion.div>

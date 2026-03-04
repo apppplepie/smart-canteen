@@ -5,7 +5,9 @@ import { request } from "@/http/axios"
 export function getCaptchaApi() {
   return request<Auth.CaptchaResponseData>({
     url: "auth/captcha",
-    method: "get"
+    method: "get",
+    // 后端未启动时快速失败，避免首屏等待过久
+    timeout: 1200
   })
 }
 

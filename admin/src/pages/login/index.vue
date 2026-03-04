@@ -28,60 +28,68 @@ const loading = ref(false)
 /** 验证码图片 URL */
 const codeUrl = ref("")
 
+/** 验证码是否加载失败（用于显示提示） */
+const captchaFailed = ref(false)
+
 /** 登录表单数据 */
 const loginFormData: LoginRequestData = reactive({
-  username: "admin",
-  password: "12345678",
+  username: "",
+  password: "",
   code: ""
 })
 
-/** 登录表单校验规则 */
+/** 登录表单校验规则（验证码仅前端必填，后端不校验内容） */
 const loginFormRules: FormRules = {
   username: [
     { required: true, message: "请输入用户名", trigger: "blur" }
   ],
   password: [
-    { required: true, message: "请输入密码", trigger: "blur" },
-    { min: 8, max: 16, message: "长度在 8 到 16 个字符", trigger: "blur" }
+    { required: true, message: "请输入密码", trigger: "blur" }
   ],
   code: [
     { required: true, message: "请输入验证码", trigger: "blur" }
   ]
 }
 
-/** 登录 */
-function handleLogin() {
-  loginFormRef.value?.validate((valid) => {
-    if (!valid) {
-      ElMessage.error("表单校验不通过")
-      return
-    }
-    loading.value = true
-    loginApi(loginFormData).then(({ data }) => {
-      userStore.setToken(data.token)
-      router.push(route.query.redirect ? decodeURIComponent(route.query.redirect as string) : "/")
-    }).catch(() => {
-      createCode()
-      loginFormData.password = ""
-    }).finally(() => {
-      loading.value = false
-    })
-  })
-}
-
-/** 创建验证码 */
+/** 创建验证码图片（仅展示用，后端不校验） */
 function createCode() {
-  // 清空已输入的验证码
   loginFormData.code = ""
-  // 清空验证图片
   codeUrl.value = ""
-  // 获取验证码图片
+  captchaFailed.value = false
   getCaptchaApi().then((res) => {
     codeUrl.value = res.data
+  }).catch(() => {
+    captchaFailed.value = true
   })
 }
 
-// 初始化验证码
+/** 登录 */
+async function handleLogin() {
+  const form = loginFormRef.value
+  if (!form) {
+    ElMessage.error("表单未就绪，请稍候再试")
+    return
+  }
+  try {
+    await form.validate()
+  } catch {
+    ElMessage.error("请填写用户名、密码和验证码")
+    return
+  }
+  loading.value = true
+  try {
+    const { data } = await loginApi(loginFormData)
+    userStore.setToken(data.token)
+    router.push(route.query.redirect ? decodeURIComponent(route.query.redirect as string) : "/")
+  } catch {
+    createCode()
+    loginFormData.password = ""
+    // 错误信息已由 axios 拦截器统一弹出
+  } finally {
+    loading.value = false
+  }
+}
+
 createCode()
 </script>
 
@@ -145,6 +153,9 @@ createCode()
                 </el-image>
               </template>
             </el-input>
+            <div v-if="captchaFailed" class="captcha-hint">
+              验证码加载失败，请点击图片重试
+            </div>
           </el-form-item>
           <el-button :loading="loading" type="primary" size="large" @click.prevent="handleLogin">
             登 录
@@ -202,6 +213,11 @@ createCode()
       .el-button {
         width: 100%;
         margin-top: 10px;
+      }
+      .captcha-hint {
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--el-text-color-secondary);
       }
     }
   }

@@ -1,6 +1,10 @@
 <script lang="ts" setup>
+import { marked } from "marked"
+import DOMPurify from "dompurify"
 import { Delete, Promotion, Plus, Fold, Expand } from "@element-plus/icons-vue"
 import { useUserStore } from "@/pinia/stores/user"
+
+marked.setOptions({ gfm: true, breaks: true })
 
 const CHAT_API_BASE = (import.meta.env.VITE_CHAT_API_BASE_URL as string) || "http://localhost:8081"
 const userStore = useUserStore()
@@ -190,14 +194,23 @@ function clearMessages() {
   })
 }
 
-/** 将消息内容中的代码块转为 HTML，其余内容转义后 pre-wrap 显示 */
+/**
+ * 使用 marked 将 Markdown 转为 HTML，再用 DOMPurify 做 XSS 过滤后输出
+ */
 function renderContent(content: string): string {
-  const escaped = content
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-  return escaped.replace(/```([\s\S]*?)```/g, (_, code) => {
-    return `<pre class="code-block"><code>${code.trim()}</code></pre>`
+  if (!content?.trim()) return ""
+  const rawHtml = marked(content, { async: false }) as string
+  return DOMPurify.sanitize(rawHtml, {
+    ALLOWED_TAGS: [
+      "p", "br", "span", "div",
+      "h1", "h2", "h3", "h4", "h5", "h6",
+      "strong", "em", "b", "i", "u", "s", "a",
+      "ul", "ol", "li",
+      "pre", "code",
+      "blockquote", "hr",
+      "table", "thead", "tbody", "tr", "th", "td"
+    ],
+    ALLOWED_ATTR: ["href", "target", "rel", "class"]
   })
 }
 </script>
@@ -550,21 +563,35 @@ function renderContent(content: string): string {
   word-break: break-word;
 
   .content {
-    white-space: pre-wrap;
-  }
+    white-space: normal;
 
-  :deep(.code-block) {
-    margin: 8px 0 0;
-    padding: 10px 12px;
-    background: rgba(0 0 0 / 8%);
-    border-radius: 8px;
-    overflow-x: auto;
-    white-space: pre;
-
-    code {
+    :deep(p) { margin: 6px 0; }
+    :deep(h1) { font-size: 1.25em; font-weight: 700; margin: 12px 0 6px; }
+    :deep(h2) { font-size: 1.1em; font-weight: 600; margin: 10px 0 4px; }
+    :deep(h3) { font-size: 1em; font-weight: 600; margin: 8px 0 4px; }
+    :deep(ul), :deep(ol) { margin: 6px 0; padding-left: 20px; }
+    :deep(ol) { list-style: decimal; }
+    :deep(li) { margin: 2px 0; }
+    :deep(code) {
+      padding: 2px 6px;
       font-family: "Consolas", "Monaco", monospace;
       font-size: 13px;
+      background: rgba(0 0 0 / 8%);
+      border-radius: 4px;
     }
+    :deep(pre) {
+      margin: 8px 0;
+      padding: 10px 12px;
+      background: rgba(0 0 0 / 8%);
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    :deep(pre code) {
+      padding: 0;
+      background: none;
+    }
+    :deep(a) { color: var(--el-color-primary); }
   }
 }
 

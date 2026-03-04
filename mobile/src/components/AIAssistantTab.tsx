@@ -56,7 +56,9 @@ function formatConversationTime(iso: string): string {
   return weekdays[d.getDay()] + " " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
-export function AIAssistantTab() {
+export type AIAssistantUser = { userId?: number } | null;
+
+export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MSG]);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [input, setInput] = useState("");
@@ -65,11 +67,19 @@ export function AIAssistantTab() {
   const [historyChats, setHistoryChats] = useState<{ id: number; title: string; time: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const authHeaders = (): HeadersInit => {
+    const h: HeadersInit = { "Content-Type": "application/json" };
+    if (user?.userId != null) {
+      (h as Record<string, string>)["X-User-Id"] = String(user.userId);
+    }
+    return h;
+  };
+
   const fetchHistoryChats = async () => {
     if (!API_BASE_URL) return;
     try {
       const url = `${API_BASE_URL}/api/ai/conversations`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: authHeaders() });
       const raw = await res.text();
       const data = raw ? JSON.parse(raw) : {};
       const list = (data?.data ?? []) as { id: number; title: string; updatedAt: string }[];
@@ -81,7 +91,7 @@ export function AIAssistantTab() {
 
   useEffect(() => {
     if (isDrawerOpen) fetchHistoryChats();
-  }, [isDrawerOpen]);
+  }, [isDrawerOpen, user?.userId]);
 
   const startNewChat = () => {
     setConversationId(null);
@@ -91,7 +101,7 @@ export function AIAssistantTab() {
   const loadHistoryChat = async (chatId: number) => {
     if (!API_BASE_URL) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/ai/conversations/${chatId}/messages`);
+      const res = await fetch(`${API_BASE_URL}/api/ai/conversations/${chatId}/messages`, { headers: authHeaders() });
       const raw = await res.text();
       const data = raw ? JSON.parse(raw) : {};
       const list = (data?.data ?? []) as { id: number; role: string; content: string; suggestions?: string[] }[];
@@ -157,12 +167,11 @@ export function AIAssistantTab() {
         clientType: "mobile",
       };
       if (conversationId != null) body.conversationId = conversationId;
-      // 若有当前登录用户 ID，可设置 body.userId 以便会话归属与后端解析 role
-      // if (currentUserId != null) body.userId = currentUserId;
+      if (user?.userId != null) body.userId = user.userId;
 
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify(body),
       });
 

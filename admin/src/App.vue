@@ -16,12 +16,10 @@ initTheme()
 // 初始化灰色模式和色弱模式
 initGreyAndColorWeakness()
 
-// #region 初始化通知
-initStarNotification()
-
-initStoreNotification()
-
-initMobileNotification()
+// #region 初始化通知（已关闭右下角自动弹窗）
+// initStarNotification()
+// initStoreNotification()
+// initMobileNotification()
 // #endregion
 </script>
 

@@ -15,6 +15,8 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpStatusCodeException;
+
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
@@ -117,7 +119,7 @@ public class AiChatController {
      * 流程：取/建会话 → 存用户消息 → 转发 FastAPI → 存助手消息 → 返回 content + conversationId
      */
     @PostMapping(value = "/chat", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ApiResult<Map<String, Object>> chat(@RequestBody Map<String, Object> body) {
+    public ApiResult<Map<String, Object>> chat(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         @SuppressWarnings("unchecked")
         List<Map<String, String>> messages = (List<Map<String, String>>) body.get("messages");
         if (messages == null || messages.isEmpty()) {
@@ -126,6 +128,16 @@ public class AiChatController {
 
         Long conversationId = body.get("conversationId") != null ? ((Number) body.get("conversationId")).longValue() : null;
         Long userId = body.get("userId") != null ? ((Number) body.get("userId")).longValue() : null;
+        // 未传 body.userId 时从请求头 X-User-Id 取，保证新建会话也能带上当前用户 id 落库
+        if (userId == null && request != null) {
+            String header = request.getHeader("X-User-Id");
+            if (header != null && !header.isBlank()) {
+                try {
+                    userId = Long.parseLong(header.trim());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
         // clientType: admin | screen | mobile，供 AI 服务区分 Agent 与 Tool 白名单（admin 需 RBAC）
         String clientType = body.get("clientType") != null ? body.get("clientType").toString().trim().toLowerCase() : "mobile";
         if (!List.of("admin", "screen", "mobile").contains(clientType)) {
@@ -239,10 +251,22 @@ public class AiChatController {
     }
 
     /**
-     * GET /api/ai/conversations?userId= 会话列表，按 updated_at 倒序。未传 userId 时返回空（未登录不展示历史）
+     * GET /api/ai/conversations?userId= 会话列表，按 updated_at 倒序。
+     * userId 优先取 query，未传时从请求头 X-User-Id 解析；都没有则返回空（未登录不展示历史）
      */
     @GetMapping(value = "/conversations", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ApiResult<List<Map<String, Object>>> listConversations(@RequestParam(required = false) Long userId) {
+    public ApiResult<List<Map<String, Object>>> listConversations(
+            @RequestParam(required = false) Long userId,
+            HttpServletRequest request) {
+        if (userId == null && request != null) {
+            String header = request.getHeader("X-User-Id");
+            if (header != null && !header.isBlank()) {
+                try {
+                    userId = Long.parseLong(header.trim());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
         List<AiConversation> list;
         if (userId != null) {
             list = conversationRepo.findByUser_IdOrderByUpdatedAtDesc(userId);
