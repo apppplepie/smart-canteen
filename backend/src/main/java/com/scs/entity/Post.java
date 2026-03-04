@@ -33,6 +33,9 @@ public class Post {
     @Column(columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
+
     @Column(name = "media_urls", columnDefinition = "JSON")
     private String mediaUrls;
 
@@ -60,6 +63,8 @@ public class Post {
     public void setTitle(String title) { this.title = title; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public String getMediaUrls() { return mediaUrls; }
     public void setMediaUrls(String mediaUrls) { this.mediaUrls = mediaUrls; }
     public Integer getLikeCount() { return likeCount; }

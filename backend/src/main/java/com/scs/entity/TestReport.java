@@ -41,6 +41,9 @@ public class TestReport {
     @Column(name = "report_url", length = 512)
     private String reportUrl;
 
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
+
     @Column(name = "tested_at")
     private LocalDateTime testedAt;
 
@@ -70,6 +73,8 @@ public class TestReport {
     public void setLabName(String labName) { this.labName = labName; }
     public String getReportUrl() { return reportUrl; }
     public void setReportUrl(String reportUrl) { this.reportUrl = reportUrl; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public LocalDateTime getTestedAt() { return testedAt; }
     public void setTestedAt(LocalDateTime testedAt) { this.testedAt = testedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }

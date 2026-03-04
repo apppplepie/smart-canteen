@@ -28,7 +28,7 @@ export function MyPostsPage({ onBack, user }: { onBack: () => void; user: { name
       try {
         const list = await listPostsByUser(uid);
         if (cancelled) return;
-        const mapped = list.map((p) => postToSharedPost(p));
+        const mapped = list.map((p) => postToSharedPost(p, undefined, base.replace(/\/$/, "")));
         setPosts(mapped.length ? mapped : FALLBACK);
       } catch {
         if (!cancelled) setPosts(FALLBACK);

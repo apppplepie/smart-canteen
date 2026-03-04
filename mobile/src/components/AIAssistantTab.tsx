@@ -147,10 +147,18 @@ export function AIAssistantTab() {
         { role: "user", content: text },
       ];
 
-      const body: { messages: typeof apiMessages; conversationId?: number | null; userId?: number | null } = {
+      const body: {
+        messages: typeof apiMessages
+        conversationId?: number | null
+        userId?: number | null
+        clientType?: string
+      } = {
         messages: apiMessages,
+        clientType: "mobile",
       };
       if (conversationId != null) body.conversationId = conversationId;
+      // 若有当前登录用户 ID，可设置 body.userId 以便会话归属与后端解析 role
+      // if (currentUserId != null) body.userId = currentUserId;
 
       const res = await fetch(url, {
         method: "POST",

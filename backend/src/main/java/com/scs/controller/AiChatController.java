@@ -100,6 +100,16 @@ public class AiChatController {
 
         Long conversationId = body.get("conversationId") != null ? ((Number) body.get("conversationId")).longValue() : null;
         Long userId = body.get("userId") != null ? ((Number) body.get("userId")).longValue() : null;
+        // clientType: admin | screen | mobile，供 AI 服务区分 Agent 与 Tool 白名单（admin 需 RBAC）
+        String clientType = body.get("clientType") != null ? body.get("clientType").toString().trim().toLowerCase() : "mobile";
+        if (!List.of("admin", "screen", "mobile").contains(clientType)) {
+            clientType = "mobile";
+        }
+        // admin 时 role：请求体可带 role，否则按 userId 查库
+        String role = body.get("role") != null ? body.get("role").toString().trim() : null;
+        if (role == null && userId != null) {
+            role = userRepo.findById(userId).map(u -> u.getRole() != null ? u.getRole() : "guest").orElse("guest");
+        }
 
         String lastUserContent = messages.stream()
                 .filter(m -> "user".equals(m.get("role")))
@@ -135,7 +145,10 @@ public class AiChatController {
         messageRepo.save(userMsg);
 
         try {
-            Map<String, Object> forwardBody = Map.of("messages", messages);
+            Map<String, Object> forwardBody = new java.util.HashMap<>(Map.of("messages", messages, "clientType", clientType));
+            if (role != null && !role.isBlank()) {
+                forwardBody.put("role", role);
+            }
             String jsonBody = objectMapper.writeValueAsString(forwardBody);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);

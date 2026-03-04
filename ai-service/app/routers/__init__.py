@@ -1,11 +1,12 @@
 """
 API 路由汇总：挂到 FastAPI 时使用 prefix="/api"，即 /api/chat 等。
+POST /api/chat 走带工具的 Agent，可根据用户指令查库并回复。
 """
+import asyncio
 import json
 import logging
 import os
 
-import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
@@ -13,7 +14,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 
 
@@ -37,6 +37,14 @@ def _normalize_messages(raw: list) -> list[dict]:
     return out
 
 
+def _last_user_content(messages: list[dict]) -> str:
+    """取最后一条用户消息内容，供 Agent 使用。"""
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            return (m.get("content") or "").strip()
+    return ""
+
+
 @api_router.post("/chat", response_model=ChatResponse)
 async def chat(request: Request) -> ChatResponse:
     if not DEEPSEEK_API_KEY:
@@ -57,39 +65,19 @@ async def chat(request: Request) -> ChatResponse:
         logging.warning("chat invalid messages: req keys=%s", list(req.keys()) if isinstance(req, dict) else req)
         raise HTTPException(status_code=422, detail="messages 必填且为非空数组")
     messages = _normalize_messages(raw_messages)
-    payload = {
-        "model": req.get("model") or "deepseek-chat",
-        "messages": messages,
-        "temperature": float(req.get("temperature", 0.6)),
-        "max_tokens": int(req.get("max_tokens", 1024)),
-    }
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.post(
-            DEEPSEEK_API_URL,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-            },
-            json=payload,
-        )
-    if r.status_code != 200:
-        raise HTTPException(
-            status_code=502,
-            detail=f"DeepSeek API error {r.status_code}: {r.text[:500]}",
-        )
-    data = r.json()
-    content = (
-        (data.get("choices") or [{}])[0]
-        .get("message", {})
-        .get("content", "")
-        .strip()
-    )
-    if not content:
-        # 方便在终端直接看到：DeepSeek 原始结构可能和预期不同
-        print("[DeepSeek] 返回空 content，原始 data.keys():", list(data.keys()), "choices[0]:", (data.get("choices") or [{}])[0], flush=True)
-        logging.warning("DeepSeek 返回空 content, response keys=%s, choices[0]=%s", list(data.keys()), (data.get("choices") or [{}])[0])
-        content = "连上了fastapi，但deepseek返回空content"
-    # 终端可见：最终返回给前端的回复（来自 DeepSeek 或上面的 fallback）
-    print("[DeepSeek 回复]", content[:300] + ("..." if len(content) > 300 else ""), flush=True)
-    logging.info("[DeepSeek 回复] %s", content if len(content) <= 500 else content[:500] + "...")
+    last_user = _last_user_content(messages)
+    if not last_user:
+        raise HTTPException(status_code=422, detail="messages 中需至少有一条 user 消息")
+
+    # clientType: admin | screen | mobile（缺省 mobile）；admin 时 role 由后端传入，用于 RBAC + Tool 白名单
+    client_type = (req.get("clientType") or "mobile").strip().lower()
+    if client_type not in ("admin", "screen", "mobile"):
+        client_type = "mobile"
+    role = req.get("role")  # 仅 admin 使用，Spring Boot 根据 userId 解析后传入
+
+    from app.ai_agent import process_message
+    content = await asyncio.to_thread(process_message, last_user, client_type, role)
+
+    print("[Agent 回复]", content[:300] + ("..." if len(content) > 300 else ""), flush=True)
+    logging.info("[Agent 回复] %s", content if len(content) <= 500 else content[:500] + "...")
     return ChatResponse(content=content)

@@ -2,6 +2,18 @@
  * 与 backend 实体对应的前端 DTO（与 Spring/Jackson 序列化一致，camelCase）
  */
 
+export interface UserDto {
+  id: number;
+  username: string;
+  displayName?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  imageUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface VendorDto {
   id: number;
   name: string;
@@ -37,6 +49,7 @@ export interface PostDto {
   vendorId?: number;
   title?: string;
   content?: string;
+  imageUrl?: string;
   mediaUrls?: string;
   likeCount?: number;
   commentCount?: number;
@@ -84,6 +97,7 @@ export interface TestReportDto {
   unit?: string;
   labName?: string;
   reportUrl?: string;
+  imageUrl?: string;
   testedAt?: string;
   createdAt?: string;
 }

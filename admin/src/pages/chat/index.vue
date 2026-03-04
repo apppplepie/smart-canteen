@@ -1,7 +1,9 @@
 <script lang="ts" setup>
 import { Delete, Promotion } from "@element-plus/icons-vue"
+import { useUserStore } from "@/pinia/stores/user"
 
 const CHAT_API_BASE = (import.meta.env.VITE_CHAT_API_BASE_URL as string) || "http://localhost:8081"
+const userStore = useUserStore()
 
 interface Message {
   role: "user" | "assistant"
@@ -39,7 +41,16 @@ async function sendMessage() {
     const apiMessages = messages.value
       .slice(0, -1)
       .map(({ role, content: c }) => ({ role, content: c }))
-    const body: { messages: typeof apiMessages; conversationId?: number | null } = { messages: apiMessages }
+    const body: {
+      messages: typeof apiMessages
+      conversationId?: number | null
+      clientType?: string
+      role?: string
+    } = {
+      messages: apiMessages,
+      clientType: "admin",
+      role: userStore.roles?.[0] ?? "guest"
+    }
     if (conversationId.value != null) body.conversationId = conversationId.value
 
     const response = await fetch(`${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/chat`, {

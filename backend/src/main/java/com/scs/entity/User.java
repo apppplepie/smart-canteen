@@ -26,6 +26,9 @@ public class User {
     @Column(length = 32)
     private String role = "student";
 
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -59,6 +62,8 @@ public class User {
     public void setPhone(String phone) { this.phone = phone; }
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

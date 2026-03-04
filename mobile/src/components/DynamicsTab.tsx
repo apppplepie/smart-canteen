@@ -43,7 +43,7 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
     try {
       const [postList, vendorList] = await Promise.all([listPosts(), listVendors()]);
       const vendorMap = new Map(vendorList.map((v) => [v.id, v.name]));
-      const mapped = postList.map((p) => postToSharedPost(p, vendorMap.get(p.vendorId ?? 0)));
+      const mapped = postList.map((p) => postToSharedPost(p, vendorMap.get(p.vendorId ?? 0), baseUrl));
       setPosts(mapped);
     } catch {
       setPosts(FALLBACK_POSTS);

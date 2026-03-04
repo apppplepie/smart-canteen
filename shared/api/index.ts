@@ -14,6 +14,7 @@ export {
 } from "./client";
 
 export type {
+  UserDto,
   VendorDto,
   MenuItemDto,
   PostDto,

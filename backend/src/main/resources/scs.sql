@@ -2,7 +2,7 @@
 -- Engine: InnoDB, Charset: utf8mb4
 SET FOREIGN_KEY_CHECKS=0;
 
--- Users
+-- Users (image_url: 头像，由 /api/images 提供)
 DROP TABLE IF EXISTS users;
 CREATE TABLE users (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -11,6 +11,7 @@ CREATE TABLE users (
   email VARCHAR(256),
   phone VARCHAR(32),
   role VARCHAR(32) DEFAULT 'student',
+  image_url VARCHAR(512) DEFAULT NULL COMMENT '头像URL',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   is_deleted TINYINT(1) DEFAULT 0
@@ -135,6 +136,7 @@ CREATE TABLE test_reports (
   unit VARCHAR(16),
   lab_name VARCHAR(128),
   report_url VARCHAR(512),
+  image_url VARCHAR(512) DEFAULT NULL COMMENT '报告封面/缩略图URL',
   tested_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (vendor_id) REFERENCES vendors(id)
@@ -177,6 +179,7 @@ CREATE TABLE posts (
   vendor_id BIGINT,
   title VARCHAR(256),
   content TEXT,
+  image_url VARCHAR(512) DEFAULT NULL COMMENT '图片URL',
   media_urls JSON,
   like_count INT DEFAULT 0,
   comment_count INT DEFAULT 0,
@@ -230,10 +233,10 @@ SET FOREIGN_KEY_CHECKS=1;
 
 -- Sample data
 -- Users
-INSERT INTO users (username, display_name, email, phone, role) VALUES
-('ender','Ender','ender@example.com','+10000000001','student'),
-('alice','Alice Chen','alice@example.com','+10000000002','student'),
-('vendor01','Vendor 01','vendor01@example.com','+10000000010','vendor');
+INSERT INTO users (username, display_name, email, phone, role, image_url) VALUES
+('ender','Ender','ender@example.com','+10000000001','student',NULL),
+('alice','Alice Chen','alice@example.com','+10000000002','student',NULL),
+('vendor01','Vendor 01','vendor01@example.com','+10000000010','vendor',NULL);
 
 -- Vendors
 INSERT INTO vendors (name, description, location_label, contact_info, image_url) VALUES
@@ -275,9 +278,9 @@ INSERT INTO sensor_logs (device_id, metric, value, unit, recorded_at) VALUES
 ('sanitizer-1','ppm',750,'ppm',NOW() - INTERVAL 15 MINUTE);
 
 -- Test reports
-INSERT INTO test_reports (sample_id, vendor_id, item_type, result, numeric_value, unit, lab_name, report_url, tested_at) VALUES
-('S-20260225-01',1,'pesticide','pass',0.02,'ppm','第三方检测所','https://example.com/report1.pdf',NOW() - INTERVAL 2 DAY),
-('S-20260225-02',2,'microbiology','pass',0.0,'cfu','第三方检测所','https://example.com/report2.pdf',NOW() - INTERVAL 1 DAY);
+INSERT INTO test_reports (sample_id, vendor_id, item_type, result, numeric_value, unit, lab_name, report_url, image_url, tested_at) VALUES
+('S-20260225-01',1,'pesticide','pass',0.02,'ppm','第三方检测所','https://example.com/report1.pdf',NULL,NOW() - INTERVAL 2 DAY),
+('S-20260225-02',2,'microbiology','pass',0.0,'cfu','第三方检测所','https://example.com/report2.pdf',NULL,NOW() - INTERVAL 1 DAY);
 
 -- Retained samples
 INSERT INTO retained_samples (sample_code, vendor_id, collected_at, storage_location, status) VALUES
@@ -290,9 +293,9 @@ INSERT INTO stock_movements (material, qty, supplier, movement_type, vendor_id) 
 ('鸡蛋',200,'供货商B','in',2);
 
 -- Posts (打卡)
-INSERT INTO posts (user_id, vendor_id, title, content, media_urls) VALUES
-(1,1,'今早的香辣土豆丝不错','味道很棒，排队不长', JSON_ARRAY('https://example.com/photo1.jpg')),
-(2,2,'卤肉面超好吃','面条劲道，推荐', JSON_ARRAY('https://example.com/photo2.jpg'));
+INSERT INTO posts (user_id, vendor_id, title, content, image_url, media_urls) VALUES
+(1,1,'今早的香辣土豆丝不错','味道很棒，排队不长',NULL, JSON_ARRAY('https://example.com/photo1.jpg')),
+(2,2,'卤肉面超好吃','面条劲道，推荐',NULL, JSON_ARRAY('https://example.com/photo2.jpg'));
 
 -- Nutrition logs
 INSERT INTO nutrition_logs (user_id, order_id, calories, protein, fat, carbs) VALUES

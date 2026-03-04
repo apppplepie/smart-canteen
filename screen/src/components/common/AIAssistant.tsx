@@ -57,8 +57,9 @@ ${aiAssistantMenuContext}
       { role: 'user', content: userMessage },
     ];
 
-    const body: { messages: typeof apiMessages; conversationId?: number | null } = {
+    const body: { messages: typeof apiMessages; conversationId?: number | null; clientType?: string } = {
       messages: apiMessages,
+      clientType: 'screen',
     };
     if (conversationId != null) body.conversationId = conversationId;
 
