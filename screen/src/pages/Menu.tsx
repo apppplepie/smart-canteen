@@ -113,7 +113,7 @@ export default function Menu() {
                 const colItems = mockDishes.filter((_, idx) => idx % colCount === colIndex);
                 // Duplicate 4 times to ensure enough height for seamless scrolling
                 const displayItems = [...colItems, ...colItems, ...colItems, ...colItems];
-                const duration = 30; // 统一轮转速度 30s
+                const duration = 200; // 统一轮转速度 200s
                 const isUp = colIndex % 2 === 0; // 偶数列向上，奇数列向下
 
                 return (

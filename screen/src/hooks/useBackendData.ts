@@ -3,7 +3,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { apiGet, isApiConfigured } from '../api';
-import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto } from '../api/types';
+import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto, AllergenDisclosureDto } from '../api/types';
 import {
   menuItemsToDishes,
   buildDashboardWindow,
@@ -16,7 +16,7 @@ import type { Dish } from '../components/menu/DishCardModal';
 import { menuCategories, mockDishes } from '../mocks/menu';
 import { statusConfig, initialJustServed, initialWaiting, generateInitialWindows } from '../mocks/dashboard';
 import { generateTempData } from '../mocks/foodSafety';
-import { foodSafetyReports, foodSafetySamples, foodSafetyAllergens } from '../mocks/foodSafety';
+import { foodSafetyReports, foodSafetySamples, foodSafetyAllergens, allergenDisclosuresToDisplay } from '../mocks/foodSafety';
 import { barData, latestFeedbacks } from '../mocks/feedback';
 
 // ---------- Menu ----------
@@ -148,6 +148,7 @@ export function useFoodSafety(): {
   const [tempData, setTempData] = useState(generateTempData);
   const [reports, setReports] = useState(foodSafetyReports);
   const [samples, setSamples] = useState(foodSafetySamples);
+  const [allergens, setAllergens] = useState(foodSafetyAllergens);
   const [loading, setLoading] = useState(isApiConfigured());
   const [error, setError] = useState<string | null>(null);
   const [isFromApi, setIsFromApi] = useState(false);
@@ -163,8 +164,9 @@ export function useFoodSafety(): {
       apiGet<SensorLogDto[]>('/api/sensor-logs'),
       apiGet<TestReportDto[]>('/api/test-reports'),
       apiGet<RetainedSampleDto[]>('/api/retained-samples'),
+      apiGet<AllergenDisclosureDto[]>('/api/allergen-disclosures').catch(() => []),
     ])
-      .then(([sensorLogs, testReports, retainedSamples]) => {
+      .then(([sensorLogs, testReports, retainedSamples, allergenList]) => {
         if (cancelled) return;
         const ts = sensorLogsToTimeSeries(sensorLogs);
         if (ts.length > 0) setTempData(ts);
@@ -175,7 +177,10 @@ export function useFoodSafety(): {
         if (rep.length > 0) setReports(rep as typeof foodSafetyReports);
         const sam = retainedSamples.map(retainedSampleToDisplay);
         if (sam.length > 0) setSamples(sam);
-        setIsFromApi(true);
+        if (allergenList && allergenList.length > 0) {
+          setAllergens(allergenDisclosuresToDisplay(allergenList));
+          setIsFromApi(true);
+        }
       })
       .catch(() => {
         if (!cancelled) setLoading(false);
@@ -192,7 +197,7 @@ export function useFoodSafety(): {
     tempData,
     reports,
     samples,
-    allergens: foodSafetyAllergens,
+    allergens,
     loading,
     error,
     isFromApi,

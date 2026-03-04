@@ -1,351 +1,377 @@
--- MySQL-compatible schema for Canteen system (generated 2026-02-28T05:50:11.656622Z)
--- Engine: InnoDB, Charset: utf8mb4
-SET FOREIGN_KEY_CHECKS=0;
+/*
+ Navicat Premium Data Transfer
 
--- Users (image_url: 头像，由 /api/images 提供)
-DROP TABLE IF EXISTS users;
-CREATE TABLE users (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(64) NOT NULL UNIQUE,
-  display_name VARCHAR(128),
-  email VARCHAR(256),
-  phone VARCHAR(32),
-  role VARCHAR(32) DEFAULT 'student',
-  image_url VARCHAR(512) DEFAULT NULL COMMENT '头像URL',
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  is_deleted TINYINT(1) DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ Source Server         : mysql
+ Source Server Type    : MySQL
+ Source Server Version : 80044 (8.0.44)
+ Source Host           : localhost:3306
+ Source Schema         : scs
 
--- Vendors / Windows (image_url 存 /api/images/xxx.jpg，由后端静态目录提供)
-DROP TABLE IF EXISTS vendors;
-CREATE TABLE vendors (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(128) NOT NULL,
-  description TEXT,
-  location_label VARCHAR(64),
-  contact_info VARCHAR(256),
-  image_url VARCHAR(512) DEFAULT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  is_active TINYINT(1) DEFAULT 1
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ Target Server Type    : MySQL
+ Target Server Version : 80044 (8.0.44)
+ File Encoding         : 65001
 
--- Menu items (image_url: 菜品主图/封面，若需多图可另建 menu_item_images 表)
-DROP TABLE IF EXISTS menu_items;
-CREATE TABLE menu_items (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  vendor_id BIGINT NOT NULL,
-  name VARCHAR(256) NOT NULL,
-  description TEXT,
-  price DECIMAL(8,2) NOT NULL DEFAULT 0,
-  prep_time_seconds INT DEFAULT 300,
-  calories INT NULL,
-  protein FLOAT NULL,
-  fat FLOAT NULL,
-  carbs FLOAT NULL,
-  image_url VARCHAR(512) DEFAULT NULL,
-  is_available TINYINT(1) DEFAULT 1,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_menu_vendor ON menu_items(vendor_id);
+ Date: 04/03/2026 14:59:29
+*/
 
--- Orders
-DROP TABLE IF EXISTS orders;
-CREATE TABLE orders (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT,
-  vendor_id BIGINT,
-  total_amount DECIMAL(10,2) DEFAULT 0,
-  status VARCHAR(32) DEFAULT 'pending',
-  queue_number VARCHAR(32),
-  placed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id),
-  FOREIGN KEY (vendor_id) REFERENCES vendors(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_orders_user ON orders(user_id);
-CREATE INDEX idx_orders_vendor ON orders(vendor_id);
-CREATE INDEX idx_orders_status ON orders(status);
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS order_items;
-CREATE TABLE order_items (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  order_id BIGINT NOT NULL,
-  menu_item_id BIGINT,
-  quantity INT DEFAULT 1,
-  price_each DECIMAL(8,2),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-  FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_order_items_order ON order_items(order_id);
-
--- Queue entries
-DROP TABLE IF EXISTS queue_entries;
-CREATE TABLE queue_entries (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  vendor_id BIGINT NOT NULL,
-  user_id BIGINT,
-  queue_number VARCHAR(32) NOT NULL,
-  status VARCHAR(32) DEFAULT 'waiting',
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  called_at DATETIME NULL,
-  served_at DATETIME NULL,
-  FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_queue_vendor_status ON queue_entries(vendor_id, status);
-
--- Call events
-DROP TABLE IF EXISTS call_events;
-CREATE TABLE call_events (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  queue_entry_id BIGINT,
-  vendor_id BIGINT,
-  event_type VARCHAR(32),
-  message TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (queue_entry_id) REFERENCES queue_entries(id) ON DELETE CASCADE,
-  FOREIGN KEY (vendor_id) REFERENCES vendors(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Sensor logs
-DROP TABLE IF EXISTS sensor_logs;
-CREATE TABLE sensor_logs (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  device_id VARCHAR(64),
-  metric VARCHAR(64),
-  value DOUBLE,
-  unit VARCHAR(16),
-  recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_sensor_metric_time ON sensor_logs(metric, recorded_at);
-
--- Test reports
-DROP TABLE IF EXISTS test_reports;
-CREATE TABLE test_reports (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  sample_id VARCHAR(64),
-  vendor_id BIGINT,
-  item_type VARCHAR(64),
-  result VARCHAR(32),
-  numeric_value DOUBLE,
-  unit VARCHAR(16),
-  lab_name VARCHAR(128),
-  report_url VARCHAR(512),
-  image_url VARCHAR(512) DEFAULT NULL COMMENT '报告封面/缩略图URL',
-  tested_at DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (vendor_id) REFERENCES vendors(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_test_vendor ON test_reports(vendor_id);
-
--- Retained samples
-DROP TABLE IF EXISTS retained_samples;
-CREATE TABLE retained_samples (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  sample_code VARCHAR(64) UNIQUE,
-  vendor_id BIGINT,
-  collected_at DATETIME,
-  storage_location VARCHAR(128),
-  status VARCHAR(32) DEFAULT 'available',
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (vendor_id) REFERENCES vendors(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_samples_vendor ON retained_samples(vendor_id);
-
--- Stock movements
-DROP TABLE IF EXISTS stock_movements;
-CREATE TABLE stock_movements (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  material VARCHAR(256),
-  qty INT,
-  supplier VARCHAR(256),
-  movement_type VARCHAR(8),
-  vendor_id BIGINT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (vendor_id) REFERENCES vendors(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_stock_vendor ON stock_movements(vendor_id);
-
--- Posts (UGC)
-DROP TABLE IF EXISTS posts;
-CREATE TABLE posts (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT,
-  vendor_id BIGINT,
-  title VARCHAR(256),
-  content TEXT,
-  image_url VARCHAR(512) DEFAULT NULL COMMENT '图片URL',
-  media_urls JSON,
-  like_count INT DEFAULT 0,
-  comment_count INT DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id),
-  FOREIGN KEY (vendor_id) REFERENCES vendors(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_posts_user ON posts(user_id);
-CREATE INDEX idx_posts_vendor ON posts(vendor_id);
-
--- Nutrition logs
-DROP TABLE IF EXISTS nutrition_logs;
-CREATE TABLE nutrition_logs (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT,
-  order_id BIGINT,
-  calories INT,
-  protein FLOAT,
-  fat FLOAT,
-  carbs FLOAT,
-  recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id),
-  FOREIGN KEY (order_id) REFERENCES orders(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE INDEX idx_nutrition_user ON nutrition_logs(user_id);
-
--- Agent requests (AI assistant logs)
-DROP TABLE IF EXISTS agent_requests;
-CREATE TABLE agent_requests (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT,
-  prompt TEXT,
-  response TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Audit logs
-DROP TABLE IF EXISTS audit_logs;
-CREATE TABLE audit_logs (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  actor_id BIGINT,
-  action VARCHAR(128),
-  object_type VARCHAR(64),
-  object_id VARCHAR(64),
-  details JSON,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-SET FOREIGN_KEY_CHECKS=1;
-
--- Sample data
--- Users
-INSERT INTO users (username, display_name, email, phone, role, image_url) VALUES
-('ender','Ender','ender@example.com','+10000000001','student',NULL),
-('alice','Alice Chen','alice@example.com','+10000000002','student',NULL),
-('vendor01','Vendor 01','vendor01@example.com','+10000000010','vendor',NULL);
-
--- Vendors
-INSERT INTO vendors (name, description, location_label, contact_info, image_url) VALUES
-('香辣小炒','川味快餐','窗口 01','+10000000011',NULL),
-('面馆阿强','手工面食','窗口 02','+10000000012',NULL),
-('蒸菜坊','健康蒸菜','窗口 03','+10000000013',NULL);
-
--- Menu items
-INSERT INTO menu_items (vendor_id, name, description, price, prep_time_seconds, calories, image_url) VALUES
-(1,'香辣土豆丝','微辣，配米饭',12.00,180,320,NULL),
-(1,'回锅肉','经典回锅肉',18.00,300,520,NULL),
-(2,'卤肉面','卤汁浓郁',14.00,240,450,NULL),
-(2,'牛肉面','大块牛肉',22.00,360,680,NULL),
-(3,'清蒸鱼','低油清淡',28.00,420,300,NULL),
-(3,'蒸蔬菜拼盘','时令蔬菜',10.00,120,150,NULL);
-
--- Orders and order items
-INSERT INTO orders (user_id, vendor_id, total_amount, status, queue_number) VALUES
-(1,1,12.00,'ready','A101'),
-(2,2,14.00,'preparing','B202');
-
-INSERT INTO order_items (order_id, menu_item_id, quantity, price_each) VALUES
-(1,1,1,12.00),
-(2,3,1,14.00);
-
--- Queue entries
-INSERT INTO queue_entries (vendor_id, user_id, queue_number, status, created_at) VALUES
-(1,1,'Q001','waiting',NOW() - INTERVAL 5 MINUTE),
-(2,2,'Q002','called',NOW() - INTERVAL 2 MINUTE),
-(3,NULL,'Q003','waiting',NOW() - INTERVAL 1 MINUTE);
-
--- Call events
-INSERT INTO call_events (queue_entry_id, vendor_id, event_type, message) VALUES
-(2,2,'called','请到窗口02取餐 B202');
-
--- Sensor logs
-INSERT INTO sensor_logs (device_id, metric, value, unit, recorded_at) VALUES
-('fridge-A','temp',3.5,'C',NOW() - INTERVAL 10 MINUTE),
-('sanitizer-1','ppm',750,'ppm',NOW() - INTERVAL 15 MINUTE);
-
--- Test reports
-INSERT INTO test_reports (sample_id, vendor_id, item_type, result, numeric_value, unit, lab_name, report_url, image_url, tested_at) VALUES
-('S-20260225-01',1,'pesticide','pass',0.02,'ppm','第三方检测所','https://example.com/report1.pdf',NULL,NOW() - INTERVAL 2 DAY),
-('S-20260225-02',2,'microbiology','pass',0.0,'cfu','第三方检测所','https://example.com/report2.pdf',NULL,NOW() - INTERVAL 1 DAY);
-
--- Retained samples
-INSERT INTO retained_samples (sample_code, vendor_id, collected_at, storage_location, status) VALUES
-('RS-0001',1,NOW() - INTERVAL 7 DAY,'冰箱A','available'),
-('RS-0002',2,NOW() - INTERVAL 3 DAY,'冰箱B','available');
-
--- Stock movements
-INSERT INTO stock_movements (material, qty, supplier, movement_type, vendor_id) VALUES
-('大米',100,'供货商A','in',1),
-('鸡蛋',200,'供货商B','in',2);
-
--- Posts (打卡)
-INSERT INTO posts (user_id, vendor_id, title, content, image_url, media_urls) VALUES
-(1,1,'今早的香辣土豆丝不错','味道很棒，排队不长',NULL, JSON_ARRAY('https://example.com/photo1.jpg')),
-(2,2,'卤肉面超好吃','面条劲道，推荐',NULL, JSON_ARRAY('https://example.com/photo2.jpg'));
-
--- Nutrition logs
-INSERT INTO nutrition_logs (user_id, order_id, calories, protein, fat, carbs) VALUES
-(1,1,320,12,10,40);
-
--- Agent requests
-INSERT INTO agent_requests (user_id, prompt, response) VALUES
-(1,'今天吃什么不排队','推荐窗口03，预计等待 4 分钟');
-
--- Audit logs
-INSERT INTO audit_logs (actor_id, action, object_type, object_id, details) VALUES
-(1,'create_order','order','1', JSON_OBJECT('amount',12.00));
-
--- Example update to mark an order as ready
-UPDATE orders SET status='ready' WHERE id=1;
-
-
-CREATE TABLE `ai_messages` (
+-- ----------------------------
+-- Table structure for agent_requests
+-- ----------------------------
+DROP TABLE IF EXISTS `agent_requests`;
+CREATE TABLE `agent_requests`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `conversation_id` bigint NOT NULL COMMENT '所属会话',
-  `role` enum('user','assistant','system','tool') COLLATE utf8mb4_unicode_ci NOT NULL,
-  `content` text COLLATE utf8mb4_unicode_ci COMMENT '正文；tool 时为执行结果',
-  `tool_calls` json DEFAULT NULL COMMENT 'assistant 发起的 tool 调用列表',
-  `tool_call_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'role=tool 时对应 tool_calls[].id',
-  `suggestions` json DEFAULT NULL COMMENT '前端快捷建议 ["xxx","yyy"]',
-  `sort_order` int NOT NULL DEFAULT '0',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_conversation_order` (`conversation_id`,`sort_order`),
-  KEY `idx_conversation_created` (`conversation_id`,`created_at`),
-  CONSTRAINT `fk_msg_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `ai_conversations` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 对话消息';
+  `user_id` bigint NULL DEFAULT NULL,
+  `prompt` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  `response` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `user_id`(`user_id` ASC) USING BTREE,
+  CONSTRAINT `agent_requests_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
-CREATE TABLE `ai_conversations` (
+-- ----------------------------
+-- Table structure for ai_conversations
+-- ----------------------------
+DROP TABLE IF EXISTS `ai_conversations`;
+CREATE TABLE `ai_conversations`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `user_id` bigint DEFAULT NULL COMMENT '用户标识，未登录可空',
-  `title` varchar(256) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '会话标题，如首条问题摘要',
-  `context_summary` text COLLATE utf8mb4_unicode_ci COMMENT '超过5轮时此前对话的摘要，约500字，供带上下文回复',
-  `context_summary_message_count` int DEFAULT NULL COMMENT '摘要所覆盖的消息条数（从会话开头算），用于判断是否需重新生成摘要',
+  `user_id` bigint NULL DEFAULT NULL COMMENT '用户标识，未登录可空',
+  `title` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '会话标题，如首条问题摘要',
+  `context_summary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '超过5轮时此前对话的摘要，约500字',
+  `context_summary_message_count` int NULL DEFAULT NULL COMMENT '摘要所覆盖的消息条数',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_user_updated` (`user_id`,`updated_at` DESC),
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_user_updated`(`user_id` ASC, `updated_at` DESC) USING BTREE,
   CONSTRAINT `fk_conversations_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 对话会话';
+) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'AI 对话会话' ROW_FORMAT = Dynamic;
 
+-- ----------------------------
+-- Table structure for ai_messages
+-- ----------------------------
+DROP TABLE IF EXISTS `ai_messages`;
+CREATE TABLE `ai_messages`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `conversation_id` bigint NOT NULL COMMENT '所属会话',
+  `role` enum('user','assistant','system','tool') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '正文；tool 时为执行结果',
+  `tool_calls` json NULL COMMENT 'assistant 发起的 tool 调用列表',
+  `tool_call_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'role=tool 时对应 tool_calls[].id',
+  `suggestions` json NULL COMMENT '前端快捷建议 [\"xxx\",\"yyy\"]',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_conversation_order`(`conversation_id` ASC, `sort_order` ASC) USING BTREE,
+  INDEX `idx_conversation_created`(`conversation_id` ASC, `created_at` ASC) USING BTREE,
+  CONSTRAINT `fk_msg_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `ai_conversations` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 55 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'AI 对话消息' ROW_FORMAT = Dynamic;
 
--- 若 ai_conversations 表是之前建的（没有 context_summary），请执行下面两行迁移后再用「超过5轮」的会话测试：
--- ALTER TABLE ai_conversations ADD COLUMN context_summary text COLLATE utf8mb4_unicode_ci COMMENT '超过5轮时此前对话的摘要，约500字' AFTER title;
--- ALTER TABLE ai_conversations ADD COLUMN context_summary_message_count int DEFAULT NULL COMMENT '摘要所覆盖的消息条数' AFTER context_summary;
+-- ----------------------------
+-- Table structure for audit_logs
+-- ----------------------------
+DROP TABLE IF EXISTS `audit_logs`;
+CREATE TABLE `audit_logs`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `actor_id` bigint NULL DEFAULT NULL,
+  `action` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `object_type` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `object_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `details` json NULL,
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
--- Done
+-- ----------------------------
+-- Table structure for call_events
+-- ----------------------------
+DROP TABLE IF EXISTS `call_events`;
+CREATE TABLE `call_events`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `queue_entry_id` bigint NULL DEFAULT NULL,
+  `vendor_id` bigint NULL DEFAULT NULL,
+  `event_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `queue_entry_id`(`queue_entry_id` ASC) USING BTREE,
+  INDEX `vendor_id`(`vendor_id` ASC) USING BTREE,
+  CONSTRAINT `call_events_ibfk_1` FOREIGN KEY (`queue_entry_id`) REFERENCES `queue_entries` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `call_events_ibfk_2` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 70 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
+-- ----------------------------
+-- Table structure for menu_items
+-- ----------------------------
+DROP TABLE IF EXISTS `menu_items`;
+CREATE TABLE `menu_items`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `vendor_id` bigint NOT NULL,
+  `name` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  `price` decimal(8, 2) NOT NULL DEFAULT 0.00,
+  `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '菜品图片URL',
+  `prep_time_seconds` int NULL DEFAULT 300,
+  `calories` int NULL DEFAULT NULL,
+  `protein` float NULL DEFAULT NULL,
+  `fat` float NULL DEFAULT NULL,
+  `carbs` float NULL DEFAULT NULL,
+  `is_available` tinyint(1) NULL DEFAULT 1,
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_menu_vendor`(`vendor_id` ASC) USING BTREE,
+  CONSTRAINT `menu_items_ibfk_1` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 67 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for nutrition_logs
+-- ----------------------------
+DROP TABLE IF EXISTS `nutrition_logs`;
+CREATE TABLE `nutrition_logs`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NULL DEFAULT NULL,
+  `order_id` bigint NULL DEFAULT NULL,
+  `calories` int NULL DEFAULT NULL,
+  `protein` float NULL DEFAULT NULL,
+  `fat` float NULL DEFAULT NULL,
+  `carbs` float NULL DEFAULT NULL,
+  `recorded_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `order_id`(`order_id` ASC) USING BTREE,
+  INDEX `idx_nutrition_user`(`user_id` ASC) USING BTREE,
+  CONSTRAINT `nutrition_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `nutrition_logs_ibfk_2` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 32 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for order_items
+-- ----------------------------
+DROP TABLE IF EXISTS `order_items`;
+CREATE TABLE `order_items`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `order_id` bigint NOT NULL,
+  `menu_item_id` bigint NULL DEFAULT NULL,
+  `quantity` int NULL DEFAULT 1,
+  `price_each` decimal(8, 2) NULL DEFAULT NULL,
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `menu_item_id`(`menu_item_id` ASC) USING BTREE,
+  INDEX `idx_order_items_order`(`order_id` ASC) USING BTREE,
+  CONSTRAINT `order_items_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `order_items_ibfk_2` FOREIGN KEY (`menu_item_id`) REFERENCES `menu_items` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 156 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for orders
+-- ----------------------------
+DROP TABLE IF EXISTS `orders`;
+CREATE TABLE `orders`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NULL DEFAULT NULL,
+  `vendor_id` bigint NULL DEFAULT NULL,
+  `total_amount` decimal(10, 2) NULL DEFAULT 0.00,
+  `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'pending',
+  `queue_number` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `placed_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_orders_user`(`user_id` ASC) USING BTREE,
+  INDEX `idx_orders_vendor`(`vendor_id` ASC) USING BTREE,
+  INDEX `idx_orders_status`(`status` ASC) USING BTREE,
+  CONSTRAINT `orders_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `orders_ibfk_2` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 33 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for posts
+-- ----------------------------
+DROP TABLE IF EXISTS `posts`;
+CREATE TABLE `posts`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NULL DEFAULT NULL,
+  `vendor_id` bigint NULL DEFAULT NULL,
+  `title` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '图片URL',
+  `media_urls` json NULL,
+  `like_count` int NULL DEFAULT 0,
+  `comment_count` int NULL DEFAULT 0,
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_posts_user`(`user_id` ASC) USING BTREE,
+  INDEX `idx_posts_vendor`(`vendor_id` ASC) USING BTREE,
+  CONSTRAINT `posts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `posts_ibfk_2` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 23 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for queue_entries
+-- ----------------------------
+DROP TABLE IF EXISTS `queue_entries`;
+CREATE TABLE `queue_entries`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `vendor_id` bigint NOT NULL,
+  `user_id` bigint NULL DEFAULT NULL,
+  `queue_number` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'waiting',
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `called_at` datetime NULL DEFAULT NULL,
+  `served_at` datetime NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `user_id`(`user_id` ASC) USING BTREE,
+  INDEX `idx_queue_vendor_status`(`vendor_id` ASC, `status` ASC) USING BTREE,
+  CONSTRAINT `queue_entries_ibfk_1` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `queue_entries_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 64 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for retained_samples
+-- ----------------------------
+DROP TABLE IF EXISTS `retained_samples`;
+CREATE TABLE `retained_samples`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `sample_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `vendor_id` bigint NULL DEFAULT NULL,
+  `collected_at` datetime NULL DEFAULT NULL,
+  `storage_location` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'available',
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `sample_code`(`sample_code` ASC) USING BTREE,
+  INDEX `idx_samples_vendor`(`vendor_id` ASC) USING BTREE,
+  CONSTRAINT `retained_samples_ibfk_1` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 33 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for sensor_logs
+-- ----------------------------
+DROP TABLE IF EXISTS `sensor_logs`;
+CREATE TABLE `sensor_logs`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `device_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `metric` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `value` double NULL DEFAULT NULL,
+  `unit` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `recorded_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_sensor_metric_time`(`metric` ASC, `recorded_at` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 33 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for stock_movements
+-- ----------------------------
+DROP TABLE IF EXISTS `stock_movements`;
+CREATE TABLE `stock_movements`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `material` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `qty` int NULL DEFAULT NULL,
+  `supplier` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `movement_type` varchar(8) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `vendor_id` bigint NULL DEFAULT NULL,
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_stock_vendor`(`vendor_id` ASC) USING BTREE,
+  CONSTRAINT `stock_movements_ibfk_1` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 33 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for test_reports
+-- ----------------------------
+DROP TABLE IF EXISTS `test_reports`;
+CREATE TABLE `test_reports`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `sample_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `vendor_id` bigint NULL DEFAULT NULL,
+  `item_type` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `result` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `numeric_value` double NULL DEFAULT NULL,
+  `unit` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `lab_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `report_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '报告封面/缩略图URL',
+  `tested_at` datetime NULL DEFAULT NULL,
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_test_vendor`(`vendor_id` ASC) USING BTREE,
+  CONSTRAINT `test_reports_ibfk_1` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 33 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for users
+-- ----------------------------
+DROP TABLE IF EXISTS `users`;
+CREATE TABLE `users`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `username` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `password` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '123456' COMMENT '密码(明文)',
+  `display_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `email` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `phone` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `role` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'student',
+  `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '头像URL',
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `is_deleted` tinyint(1) NULL DEFAULT 0,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `username`(`username` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 24 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for vendors
+-- ----------------------------
+DROP TABLE IF EXISTS `vendors`;
+CREATE TABLE `vendors`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '图片URL',
+  `location_label` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `contact_info` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `is_active` tinyint(1) NULL DEFAULT 1,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for materials（食材主数据：过敏原在食材上，入库/菜品都关联此表，便于追溯供应商）
+-- ----------------------------
+DROP TABLE IF EXISTS `menu_item_materials`;
+DROP TABLE IF EXISTS `materials`;
+CREATE TABLE `materials` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `vendor_id` bigint NULL DEFAULT NULL COMMENT '所属窗口，NULL 表示全局食材',
+  `name` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '食材名称',
+  `allergen_tags` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '过敏原，逗号分隔如 麸质,海鲜,坚果',
+  `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_materials_vendor`(`vendor_id` ASC) USING BTREE,
+  CONSTRAINT `materials_ibfk_1` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '食材主数据，挂过敏原；入库与菜品均关联此表，可追溯供应商' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for menu_item_materials（菜品-食材多对多：这道菜用了哪些食材）
+-- ----------------------------
+CREATE TABLE `menu_item_materials` (
+  `menu_item_id` bigint NOT NULL,
+  `material_id` bigint NOT NULL,
+  `quantity` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '用量描述，如 100g、适量',
+  PRIMARY KEY (`menu_item_id`, `material_id`) USING BTREE,
+  INDEX `idx_mim_material`(`material_id` ASC) USING BTREE,
+  CONSTRAINT `menu_item_materials_ibfk_1` FOREIGN KEY (`menu_item_id`) REFERENCES `menu_items` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `menu_item_materials_ibfk_2` FOREIGN KEY (`material_id`) REFERENCES `materials` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '菜品用了哪些食材，用于过敏原公示与追溯' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- stock_movements 增加 material_id，便于“学生吃出问题 → 菜品 → 食材 → 入库记录 → 供应商”
+-- ----------------------------
+ALTER TABLE `stock_movements`
+  ADD COLUMN `material_id` bigint NULL DEFAULT NULL COMMENT '关联食材主数据，与 material 可并存过渡' AFTER `material`,
+  ADD INDEX `idx_stock_material`(`material_id` ASC) USING BTREE,
+  ADD CONSTRAINT `stock_movements_ibfk_2` FOREIGN KEY (`material_id`) REFERENCES `materials` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT;
+
+SET FOREIGN_KEY_CHECKS = 1;

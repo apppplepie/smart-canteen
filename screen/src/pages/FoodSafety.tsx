@@ -130,51 +130,80 @@ const TrustGauge = () => {
   );
 };
 
-// --- Report Cards Component ---
-const ReportCards = ({ reports }: { reports: Array<{ id: number; type: string; result: string; agency: string; time: string; icon?: React.ReactNode }> }) => {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full pt-12">
-      {reports.map((report, idx) => (
-        <motion.div
-          key={idx}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: idx * 0.1 }}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative overflow-hidden group flex flex-col justify-between"
-        >
-          {/* Decorative background element */}
-          <div className="absolute -right-6 -top-6 opacity-5 group-hover:scale-110 transition-transform duration-700">
-            {report.icon}
-          </div>
+const CARDS_PER_ROW = 3;
 
-          <div>
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-inner shrink-0">
+// --- Report Cards Component: 每行一组，自动轮播翻动 ---
+const ReportCards = ({ reports }: { reports: Array<{ id: number; type: string; result: string; agency: string; time: string; icon?: React.ReactNode }> }) => {
+  const [rowIndex, setRowIndex] = useState(0);
+  const rows = React.useMemo(() => {
+    const list = reports.length ? reports : [];
+    const r: typeof list[] = [];
+    for (let i = 0; i < list.length; i += CARDS_PER_ROW) {
+      r.push(list.slice(i, i + CARDS_PER_ROW));
+    }
+    return r.length ? r : [[]];
+  }, [reports]);
+
+  useEffect(() => {
+    if (rows.length <= 1) return;
+    const t = setInterval(() => {
+      setRowIndex((i) => (i + 1) % rows.length);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [rows.length]);
+
+  const currentRow = rows[rowIndex % rows.length] ?? [];
+
+  return (
+    <div className="h-full pt-12 relative">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={rowIndex}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.35 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full"
+        >
+          {currentRow.map((report, idx) => (
+            <motion.div
+              key={`${report.id}-${idx}`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.08 }}
+              className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative overflow-hidden group flex flex-col justify-between"
+            >
+              <div className="absolute -right-6 -top-6 opacity-5 group-hover:scale-110 transition-transform duration-700">
                 {report.icon}
               </div>
-              <div className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-black rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                {report.result}
+              <div>
+                <div className="flex justify-between items-start mb-4 relative z-10">
+                  <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-inner shrink-0">
+                    {report.icon}
+                  </div>
+                  <div className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-black rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                    {report.result}
+                  </div>
+                </div>
+                <div className="relative z-10 mb-4">
+                  <h3 className="text-base font-black text-white tracking-wide mb-1">{report.type}</h3>
+                  <p className="text-xs text-slate-400">{report.agency}</p>
+                </div>
               </div>
-            </div>
-
-            <div className="relative z-10 mb-4">
-              <h3 className="text-base font-black text-white tracking-wide mb-1">{report.type}</h3>
-              <p className="text-xs text-slate-400">{report.agency}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-3 border-t border-white/10 relative z-10">
-            <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium">
-              <Clock className="w-3.5 h-3.5" />
-              {report.time}
-            </div>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-bold transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] active:scale-95">
-              <QrCode className="w-3.5 h-3.5" />
-              报告
-            </button>
-          </div>
+              <div className="flex items-center justify-between pt-3 border-t border-white/10 relative z-10">
+                <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium">
+                  <Clock className="w-3.5 h-3.5" />
+                  {report.time}
+                </div>
+                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-bold transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] active:scale-95">
+                  <QrCode className="w-3.5 h-3.5" />
+                  报告
+                </button>
+              </div>
+            </motion.div>
+          ))}
         </motion.div>
-      ))}
+      </AnimatePresence>
     </div>
   );
 };
@@ -384,13 +413,13 @@ export default function FoodSafety() {
                 ))}
               </div>
             </div>
-
+{/* 
             <div className="shrink-0 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
               <p className="text-xs text-blue-300 leading-relaxed flex items-start gap-2">
                 <Info className="w-4 h-4 shrink-0 mt-0.5" />
                 温馨提示：食堂已要求各窗口严格区分加工器具。如您有严重食物过敏史，请在点餐前再次向工作人员确认。
               </p>
-            </div>
+            </div> */}
           </motion.div>
 
         </div>

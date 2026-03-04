@@ -129,3 +129,10 @@ export interface CallEventDto {
   message?: string;
   createdAt?: string;
 }
+
+/** 按窗口的过敏原公示（/api/allergen-disclosures） */
+export interface AllergenDisclosureDto {
+  vendorId: number;
+  window: string;
+  tags: string[];
+}

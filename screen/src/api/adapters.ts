@@ -3,11 +3,26 @@
  */
 import type { Dish } from '../components/menu/DishCardModal';
 import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto } from '@scs/api';
+import { getApiBaseUrl } from '@scs/api';
 
 const defaultImage = (id: number) => `https://picsum.photos/seed/dish${id}/600/800`;
 
-/** MenuItem + Vendor -> Dish */
+/** 将相对路径（如 /api/images/xxx.jpg）转为带后端基地址的完整 URL，否则返回原串 */
+function resolveImageUrl(url: string): string {
+  const u = url.trim();
+  if (!u) return u;
+  if (u.startsWith('http://') || u.startsWith('https://')) return u;
+  const base = getApiBaseUrl();
+  if (base) {
+    const baseNorm = base.replace(/\/+$/, '');
+    return u.startsWith('/') ? `${baseNorm}${u}` : `${baseNorm}/${u}`;
+  }
+  return u;
+}
+
+/** MenuItem + Vendor -> Dish（优先使用数据库 image_url，无则占位图；相对路径会拼后端 baseURL） */
 export function menuItemToDish(mi: MenuItemDto, vendor: VendorDto): Dish {
+  const rawImage = mi.imageUrl?.trim();
   return {
     id: mi.id,
     name: mi.name,
@@ -16,7 +31,7 @@ export function menuItemToDish(mi: MenuItemDto, vendor: VendorDto): Dish {
     price: Number(mi.price),
     rating: 4.5,
     tags: [],
-    image: defaultImage(mi.id),
+    image: rawImage ? resolveImageUrl(rawImage) : defaultImage(mi.id),
     desc: mi.description ?? '',
     calories: mi.calories ?? 0,
     sales: 0,

@@ -15,6 +15,14 @@ public class StockMovement {
     @Column(length = 256)
     private String material;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "material_id")
+    @JsonIgnore
+    private Material materialRef;
+
+    @Transient
+    private Long materialId;
+
     private Integer qty;
 
     @Column(length = 256)
@@ -55,4 +63,8 @@ public class StockMovement {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Long getVendorId() { return vendorId != null ? vendorId : (vendor != null ? vendor.getId() : null); }
     public void setVendorId(Long vendorId) { this.vendorId = vendorId; }
+    public Material getMaterialRef() { return materialRef; }
+    public void setMaterialRef(Material materialRef) { this.materialRef = materialRef; }
+    public Long getMaterialId() { return materialId != null ? materialId : (materialRef != null ? materialRef.getId() : null); }
+    public void setMaterialId(Long materialId) { this.materialId = materialId; }
 }

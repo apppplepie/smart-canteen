@@ -8,4 +8,5 @@ export type {
   SensorLogDto,
   PostDto,
   CallEventDto,
+  AllergenDisclosureDto,
 } from "@scs/api";

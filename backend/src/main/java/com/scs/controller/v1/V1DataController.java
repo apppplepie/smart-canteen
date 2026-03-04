@@ -34,6 +34,7 @@ public class V1DataController {
     private final SensorLogRepository sensorLogRepo;
     private final StockMovementRepository stockMovementRepo;
     private final TestReportRepository testReportRepo;
+    private final MaterialRepository materialRepo;
     private final AiConversationRepository aiConversationRepo;
     private final AiMessageRepository aiMessageRepo;
 
@@ -48,6 +49,7 @@ public class V1DataController {
                             NutritionLogRepository nutritionLogRepo, QueueEntryRepository queueEntryRepo,
                             RetainedSampleRepository retainedSampleRepo, SensorLogRepository sensorLogRepo,
                             StockMovementRepository stockMovementRepo, TestReportRepository testReportRepo,
+                            MaterialRepository materialRepo,
                             AiConversationRepository aiConversationRepo, AiMessageRepository aiMessageRepo) {
         this.objectMapper = objectMapper;
         this.userRepo = userRepo;
@@ -65,6 +67,7 @@ public class V1DataController {
         this.sensorLogRepo = sensorLogRepo;
         this.stockMovementRepo = stockMovementRepo;
         this.testReportRepo = testReportRepo;
+        this.materialRepo = materialRepo;
         this.aiConversationRepo = aiConversationRepo;
         this.aiMessageRepo = aiMessageRepo;
     }
@@ -226,6 +229,7 @@ public class V1DataController {
             if (e.getVendorId() != null) vendorRepo.findById(e.getVendorId()).ifPresent(e::setVendor);
         } else if (entity instanceof StockMovement e) {
             if (e.getVendorId() != null) vendorRepo.findById(e.getVendorId()).ifPresent(e::setVendor);
+            if (e.getMaterialId() != null) materialRepo.findById(e.getMaterialId()).ifPresent(e::setMaterialRef);
         } else if (entity instanceof TestReport e) {
             if (e.getVendorId() != null) vendorRepo.findById(e.getVendorId()).ifPresent(e::setVendor);
         } else if (entity instanceof AiConversation e) {

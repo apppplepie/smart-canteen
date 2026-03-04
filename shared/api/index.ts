@@ -25,6 +25,7 @@ export type {
   RetainedSampleDto,
   SensorLogDto,
   CallEventDto,
+  AllergenDisclosureDto,
 } from "./types";
 
 export * from "./vendors";
