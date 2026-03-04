@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PageContainer } from '../components/common/PageContainer';
 import { motion } from 'motion/react';
-import { MessageSquare, Send, BarChart3, PieChart as PieChartIcon, CheckCircle2, Clock, TrendingUp, Users } from 'lucide-react';
+import { MessageSquare, Send, BarChart3, PieChart as PieChartIcon, CheckCircle2, Clock, TrendingUp, Users, Sparkles } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -12,6 +12,8 @@ import {
   Legend
 } from 'recharts';
 import { useFeedback } from '../hooks/useBackendData';
+import { apiPost, isApiConfigured } from '../api';
+import type { PostDto } from '../api/types';
 
 const getThemeClasses = (theme: string) => {
   switch (theme) {
@@ -33,6 +35,60 @@ const getBadgeClasses = (theme: string) => {
   }
 };
 
+type FeedbackStatus = 'pending' | 'ai_replied' | 'replied';
+
+const FLOW_STEPS: { key: FeedbackStatus; label: string; icon: React.ReactNode }[] = [
+  { key: 'pending',    label: '待处理', icon: <Clock className="w-2.5 h-2.5" /> },
+  { key: 'ai_replied', label: 'AI建议', icon: <Sparkles className="w-2.5 h-2.5" /> },
+  { key: 'replied',    label: '已回复', icon: <CheckCircle2 className="w-2.5 h-2.5" /> },
+];
+
+const STATUS_ORDER: Record<FeedbackStatus, number> = { pending: 0, ai_replied: 1, replied: 2 };
+
+const STEP_COLORS: Record<FeedbackStatus, { node: string; text: string; line: string }> = {
+  pending:    { node: 'bg-amber-500/30 border-amber-400 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.4)]',    text: 'text-amber-400', line: 'bg-amber-500/60' },
+  ai_replied: { node: 'bg-violet-500/30 border-violet-400 text-violet-300 shadow-[0_0_8px_rgba(139,92,246,0.4)]', text: 'text-violet-300', line: 'bg-violet-500/60' },
+  replied:    { node: 'bg-emerald-500/30 border-emerald-400 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.4)]', text: 'text-emerald-400', line: 'bg-emerald-500/60' },
+};
+
+const StatusFlow = ({ status }: { status: FeedbackStatus }) => {
+  const current = STATUS_ORDER[status] ?? 0;
+  return (
+    <div className="flex items-center gap-0">
+      {FLOW_STEPS.map((step, idx) => {
+        const done    = idx < current;
+        const active  = idx === current;
+        const waiting = idx > current;
+        const colors  = STEP_COLORS[step.key];
+        return (
+          <React.Fragment key={step.key}>
+            <div className="flex flex-col items-center gap-1">
+              <div className={`
+                w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300
+                ${done || active ? colors.node : 'bg-slate-800 border-slate-600 text-slate-600'}
+                ${active ? ' scale-110' : ''}
+              `}>
+                {step.icon}
+              </div>
+              <span className={`text-[10px] font-semibold whitespace-nowrap leading-none
+                ${done || active ? colors.text : 'text-slate-600'}
+              `}>
+                {step.label}
+              </span>
+            </div>
+            {idx < FLOW_STEPS.length - 1 && (
+              <div className={`
+                h-0.5 w-8 mx-1 mb-3.5 rounded-full transition-all duration-300
+                ${idx < current ? STEP_COLORS[FLOW_STEPS[idx].key].line : 'bg-slate-700'}
+              `} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
+
 // --- Custom Tooltip for Recharts ---
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -52,9 +108,68 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+type FeedbackType = 'food' | 'service' | 'env' | 'other';
+
 // --- Main Component ---
 export default function Feedback() {
-  const { barData, latestFeedbacks, loading } = useFeedback();
+  const { barData, latestFeedbacks, loading, refetch } = useFeedback();
+  const [feedbackType, setFeedbackType] = useState<FeedbackType | ''>('');
+  const [contact, setContact] = useState('');
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const feedbackListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = feedbackListRef.current;
+    if (!el || latestFeedbacks.length <= 1) return;
+    const step = 1;
+    const interval = 50;
+    const timer = setInterval(() => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      if (scrollTop + clientHeight >= scrollHeight - 4) {
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        el.scrollBy({ top: step, behavior: 'auto' });
+      }
+    }, interval);
+    return () => clearInterval(timer);
+  }, [latestFeedbacks.length]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = content.trim();
+    if (!text) {
+      setSubmitError('请填写建议内容');
+      return;
+    }
+    if (!isApiConfigured()) {
+      setSubmitError('未配置后端地址，无法提交');
+      return;
+    }
+    setSubmitError(null);
+    setSubmitSuccess(false);
+    setSubmitting(true);
+    try {
+      const body: Partial<PostDto> & { content: string } = {
+        feedbackType: feedbackType || 'other',
+        content: text,
+      };
+      if (contact.trim()) body.title = contact.trim();
+      await apiPost<PostDto>('/api/posts', body);
+      setSubmitSuccess(true);
+      setContent('');
+      setFeedbackType('');
+      setContact('');
+      await refetch();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : '提交失败，请稍后重试');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <PageContainer>
       <div className="bg-slate-950 rounded-[2rem] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.2)] relative min-h-[calc(100vh-8rem)] p-6 md:p-8">
@@ -83,8 +198,8 @@ export default function Feedback() {
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 relative z-10">
           
           {/* Left Column: Latest Feedback (Takes more space on large screens) */}
-          <div className="xl:col-span-7 space-y-6 flex flex-col h-full">
-            <div className="flex items-center justify-between mb-2">
+          <div className="xl:col-span-7 space-y-6 flex flex-col">
+            <div className="flex items-center justify-between mb-2 flex-shrink-0">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Users className="text-purple-400 w-5 h-5" />
                 最新留言墙
@@ -94,7 +209,10 @@ export default function Feedback() {
               </div>
             </div>
 
-            <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <div
+              ref={feedbackListRef}
+              className="space-y-4 h-[min(90vh,1000px)] overflow-y-auto pr-2 flex-shrink-0 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {loading && <div className="text-slate-400 text-sm">加载中...</div>}
               {latestFeedbacks.map((item, idx) => (
                 <motion.div
@@ -106,35 +224,43 @@ export default function Feedback() {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${getBadgeClasses(item.theme)}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${getBadgeClasses(item.theme)}`} title="问题类型">
                         {item.type}
                       </span>
                       <p className="text-xs text-slate-400 font-mono mt-0.5">{item.time}</p>
                     </div>
-                    {item.status === 'replied' ? (
-                      <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs rounded-full font-medium shadow-[0_0_10px_rgba(16,185,129,0.1)]">
-                        <CheckCircle2 className="w-3 h-3" /> 已回复
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs rounded-full font-medium shadow-[0_0_10px_rgba(245,158,11,0.1)]">
-                        <Clock className="w-3 h-3" /> 待处理
-                      </span>
-                    )}
+                    <StatusFlow status={item.status as FeedbackStatus} />
                   </div>
                   
                   <p className="text-slate-200 text-sm leading-relaxed mb-4 font-medium">
                     "{item.content}"
                   </p>
 
-                  {item.reply && (
-                    <div className={`relative pl-4 py-3 border-l-2 bg-black/20 rounded-r-xl mt-4 ${item.theme === 'cyan' ? 'border-cyan-500/50' : item.theme === 'violet' ? 'border-violet-500/50' : item.theme === 'emerald' ? 'border-emerald-500/50' : 'border-amber-500/50'}`}>
-                      <p className={`text-xs font-bold mb-1 flex items-center gap-2 ${item.theme === 'cyan' ? 'text-cyan-400' : item.theme === 'violet' ? 'text-violet-400' : item.theme === 'emerald' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${item.theme === 'cyan' ? 'bg-cyan-400' : item.theme === 'violet' ? 'bg-violet-400' : item.theme === 'emerald' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                        官方回复
-                      </p>
-                      <p className="text-sm text-slate-300 leading-relaxed">
-                        {item.reply}
-                      </p>
+                  {/* 流程图：有 AI建议 / 官方回复 才显示 */}
+                  {(item.aiSuggestion || item.reply) && (
+                    <div className="mt-4 space-y-4">
+                      {item.aiSuggestion && (
+                        <div className="flex gap-3">
+                          <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 bg-violet-500/20 border-violet-400 text-violet-300 shadow-[0_0_12px_rgba(139,92,246,0.3)]">
+                            <Sparkles className="w-3 h-3" />
+                          </div>
+                          <div className="flex-1 rounded-xl border bg-violet-500/10 border-violet-500/30 pl-4 pr-4 py-3">
+                            <p className="text-xs font-bold mb-1.5 text-violet-400">AI建议</p>
+                            <p className="text-sm leading-relaxed text-slate-200">{item.aiSuggestion}</p>
+                          </div>
+                        </div>
+                      )}
+                      {item.reply && (
+                        <div className="flex gap-3">
+                          <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                            <CheckCircle2 className="w-3 h-3" />
+                          </div>
+                          <div className="flex-1 rounded-xl border bg-emerald-500/10 border-emerald-500/30 pl-4 pr-4 py-3">
+                            <p className="text-xs font-bold mb-1.5 text-emerald-400">官方回复</p>
+                            <p className="text-sm leading-relaxed text-slate-200">{item.reply}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </motion.div>
@@ -213,38 +339,57 @@ export default function Feedback() {
                 <Send className="text-pink-400 w-5 h-5" />
                 快速提交建议
               </h3>
-              <form className="space-y-4">
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                {submitError && (
+                  <p className="text-amber-400 text-sm">{submitError}</p>
+                )}
+                {submitSuccess && (
+                  <p className="text-emerald-400 text-sm">提交成功，感谢您的反馈！</p>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <select defaultValue="" className="w-full bg-black/20 border border-white/10 text-slate-200 text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all appearance-none">
-                      <option value="" disabled>选择留言类型</option>
-                      <option value="food" className="bg-slate-800">菜品建议</option>
-                      <option value="service" className="bg-slate-800">服务态度</option>
-                      <option value="env" className="bg-slate-800">环境卫生</option>
-                      <option value="other" className="bg-slate-800">其他</option>
+                    <select
+                      value={feedbackType}
+                      onChange={(e) => setFeedbackType((e.target.value || '') as FeedbackType | '')}
+                      className={`w-full text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 transition-all appearance-none cursor-pointer
+                        ${feedbackType
+                          ? 'bg-cyan-500/15 border border-cyan-400/40 text-cyan-200 focus:ring-cyan-400/50'
+                          : 'bg-slate-800/80 border border-white/10 text-slate-400 focus:border-cyan-400 focus:ring-cyan-400/50'
+                        }`}
+                    >
+                      <option value="" className="bg-slate-800 text-slate-300">选择留言类型</option>
+                      <option value="food" className="bg-slate-800 text-slate-200">菜品建议</option>
+                      <option value="service" className="bg-slate-800 text-slate-200">服务态度</option>
+                      <option value="env" className="bg-slate-800 text-slate-200">环境卫生</option>
+                      <option value="other" className="bg-slate-800 text-slate-200">其他</option>
                     </select>
                   </div>
                   <div>
-                    <input 
-                      type="text" 
-                      placeholder="联系方式 (选填)" 
+                    <input
+                      type="text"
+                      value={contact}
+                      onChange={(e) => setContact(e.target.value)}
+                      placeholder="联系方式 (选填)"
                       className="w-full bg-black/20 border border-white/10 text-slate-200 text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all placeholder-slate-500"
                     />
                   </div>
                 </div>
                 <div>
-                  <textarea 
+                  <textarea
                     rows={3}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
                     className="w-full bg-black/20 border border-white/10 text-slate-200 text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all placeholder-slate-500 resize-none"
                     placeholder="请详细描述您的建议或意见，我们将不断改进..."
-                  ></textarea>
+                  />
                 </div>
-                <button 
-                  type="button"
-                  className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all active:scale-95 flex items-center justify-center gap-2"
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
                   <Send className="w-4 h-4" />
-                  发送反馈
+                  {submitting ? '提交中...' : '发送反馈'}
                 </button>
               </form>
             </motion.div>

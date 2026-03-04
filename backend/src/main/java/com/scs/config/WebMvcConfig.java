@@ -11,12 +11,14 @@ import java.nio.file.Paths;
 
 /**
  * 允许 admin / mobile 等前端跨域访问后端 API；
- * 映射 /api/images/** 到 food_images 目录，供菜品图等静态资源（本机与 Docker 通用）。
+ * 映射 /api/images/** 到统一图片根目录（默认 ../images）。
+ * 链接规则：DB 存 /api/images/food/000001.jpg、/api/images/commodity/xxx.jpg，
+ * 对应文件 images/food/000001.jpg、images/commodity/xxx.jpg。
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    @Value("${scs.images-dir:../food_images}")
+    @Value("${scs.images-dir:./images}")
     private String imagesDir;
 
     @Override

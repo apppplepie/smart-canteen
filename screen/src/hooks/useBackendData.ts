@@ -216,43 +216,41 @@ export function useFeedback(): {
     time: string;
     content: string;
     reply: string | null;
-    status: 'replied' | 'pending';
+    status: 'pending' | 'ai_replied' | 'replied';
+    statusLabel: string;
+    aiSuggestion: string | null;
     theme: string;
   }>;
   loading: boolean;
   error: string | null;
   isFromApi: boolean;
+  refetch: () => Promise<void>;
 } {
   const [feedbacks, setFeedbacks] = useState(latestFeedbacks);
   const [loading, setLoading] = useState(isApiConfigured());
   const [error, setError] = useState<string | null>(null);
   const [isFromApi, setIsFromApi] = useState(false);
 
-  useEffect(() => {
-    if (!isApiConfigured()) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
+  const fetchPosts = React.useCallback(() => {
+    if (!isApiConfigured()) return Promise.resolve();
     setLoading(true);
-    apiGet<PostDto[]>('/api/posts')
+    setError(null);
+    return apiGet<PostDto[]>('/api/posts')
       .then((posts) => {
-        if (cancelled) return;
         if (posts.length > 0) {
           setFeedbacks(posts.map((p, i) => postToFeedbackItem(p, i)));
           setIsFromApi(true);
         }
       })
-      .catch(() => {
-        if (!cancelled) setLoading(false);
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : '请求失败');
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
 
   return {
     barData,
@@ -260,6 +258,7 @@ export function useFeedback(): {
     loading,
     error,
     isFromApi,
+    refetch: fetchPosts,
   };
 }
 

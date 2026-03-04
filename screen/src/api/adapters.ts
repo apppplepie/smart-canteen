@@ -197,26 +197,55 @@ export function lostItemsToDisplay(items: LostItemDto[]): Array<{ id: number; us
   });
 }
 
-/** Post -> 留言墙一项（优先 status/replyContent，无则用 commentCount 推断） */
+const FEEDBACK_TYPE_LABELS: Record<string, string> = {
+  food: '菜品建议',
+  service: '服务态度',
+  env: '环境卫生',
+  other: '其他',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: '待处理',
+  ai_replied: 'AI已建议',
+  replied: '已回复',
+};
+
+/** 根据 ai_suggestion / reply_content 推断 status（与后端一致时可忽略） */
+function normalizeStatus(p: PostDto): 'pending' | 'ai_replied' | 'replied' {
+  if (p.status === 'replied') return 'replied';
+  if (p.status === 'ai_replied' || p.status === 'in_progress') return 'ai_replied';
+  const hasAi = (p.aiSuggestion?.trim() ?? '').length > 0;
+  const hasReply = (p.replyContent?.trim() ?? '').length > 0;
+  if (hasReply) return 'replied';
+  if (hasAi) return 'ai_replied';
+  return 'pending';
+}
+
+/** Post -> 留言墙一项；含问题类型、流程状态、AI建议、官方回复 */
 export function postToFeedbackItem(p: PostDto, index: number): {
   id: number;
   type: string;
   time: string;
   content: string;
   reply: string | null;
-  status: 'replied' | 'pending';
+  status: 'pending' | 'ai_replied' | 'replied';
+  statusLabel: string;
+  aiSuggestion: string | null;
   theme: 'cyan' | 'emerald' | 'violet' | 'amber';
 } {
   const themes: ('cyan' | 'emerald' | 'violet' | 'amber')[] = ['cyan', 'emerald', 'violet', 'amber'];
   const created = p.createdAt ? new Date(p.createdAt).toLocaleString('zh-CN') : '';
-  const replied = p.status === 'replied' || (p.commentCount != null && p.commentCount > 0);
+  const typeLabel = p.feedbackType ? (FEEDBACK_TYPE_LABELS[p.feedbackType] ?? p.feedbackType) : (p.title ?? '其他');
+  const status = normalizeStatus(p);
   return {
     id: p.id,
-    type: p.title ?? '其他',
+    type: typeLabel,
     time: created,
     content: p.content ?? '',
-    reply: p.replyContent ?? (replied ? '已收到反馈，感谢您的留言。' : null),
-    status: (replied ? 'replied' : 'pending') as 'replied' | 'pending',
+    reply: p.replyContent?.trim() || null,
+    status,
+    statusLabel: STATUS_LABELS[status] ?? '待处理',
+    aiSuggestion: p.aiSuggestion?.trim() || null,
     theme: themes[index % themes.length],
   };
 }

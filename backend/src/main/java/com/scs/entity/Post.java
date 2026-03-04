@@ -30,6 +30,9 @@ public class Post {
     @Column(length = 256)
     private String title;
 
+    @Column(name = "feedback_type", length = 32)
+    private String feedbackType = "other";
+
     @Column(columnDefinition = "TEXT")
     private String content;
 
@@ -51,6 +54,9 @@ public class Post {
     @Column(name = "reply_content", columnDefinition = "TEXT")
     private String replyContent;
 
+    @Column(name = "ai_suggestion", columnDefinition = "TEXT")
+    private String aiSuggestion;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -67,6 +73,8 @@ public class Post {
     public void setVendor(Vendor vendor) { this.vendor = vendor; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+    public String getFeedbackType() { return feedbackType; }
+    public void setFeedbackType(String feedbackType) { this.feedbackType = feedbackType; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public String getImageUrl() { return imageUrl; }
@@ -81,6 +89,8 @@ public class Post {
     public void setStatus(String status) { this.status = status; }
     public String getReplyContent() { return replyContent; }
     public void setReplyContent(String replyContent) { this.replyContent = replyContent; }
+    public String getAiSuggestion() { return aiSuggestion; }
+    public void setAiSuggestion(String aiSuggestion) { this.aiSuggestion = aiSuggestion; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Long getUserId() { return userId != null ? userId : (user != null ? user.getId() : null); }

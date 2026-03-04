@@ -48,6 +48,8 @@ export interface PostDto {
   userId?: number;
   vendorId?: number;
   title?: string;
+  /** food=菜品建议, service=服务态度, env=环境卫生, other=其他 */
+  feedbackType?: string;
   content?: string;
   imageUrl?: string;
   mediaUrls?: string;
@@ -55,6 +57,8 @@ export interface PostDto {
   commentCount?: number;
   status?: string;
   replyContent?: string;
+  /** AI建议（预留，可为空） */
+  aiSuggestion?: string;
   createdAt?: string;
 }
 

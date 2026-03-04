@@ -1,5 +1,5 @@
 # 本地图片目录，不提交（由 tool 下载或挂载）
-food_images/
+images/
 
 # 编辑器/工具临时文件
 _tmp_*

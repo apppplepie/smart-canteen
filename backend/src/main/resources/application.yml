@@ -1,9 +1,10 @@
 server:
   port: 8081  # 8080 被占用且无权限结束时用 8081，前端 .env 填 http://localhost:8081
 
-# 菜品等静态图片目录（相对 backend 运行目录或绝对路径），Docker 可设 IMAGES_DIR=/app/food_images
+# 静态图片根目录（其下 food/、commodity/ 对应 /api/images/food/*、/api/images/commodity/*）
+# 用引号包住绝对路径，否则 YAML 会把路径里的冒号当键值分隔符；也可改回 ${IMAGES_DIR:./images} 并从项目根启动
 scs:
-  images-dir: ${IMAGES_DIR:../food_images}
+  images-dir: "D:/workspace/code/test/scs/images"
 
 # AI 服务（FastAPI）地址，供 /api/ai/chat 转调
 ai:
