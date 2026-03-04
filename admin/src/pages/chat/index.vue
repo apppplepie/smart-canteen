@@ -1,13 +1,21 @@
 <script lang="ts" setup>
-import { Delete, Promotion } from "@element-plus/icons-vue"
+import { Delete, Promotion, Plus, Fold, Expand } from "@element-plus/icons-vue"
 import { useUserStore } from "@/pinia/stores/user"
 
 const CHAT_API_BASE = (import.meta.env.VITE_CHAT_API_BASE_URL as string) || "http://localhost:8081"
 const userStore = useUserStore()
+/** 可选：用于拉取历史对话的用户 ID，不传则后端返回空列表 */
+const AI_USER_ID = import.meta.env.VITE_AI_USER_ID ? Number(import.meta.env.VITE_AI_USER_ID) : null
 
 interface Message {
   role: "user" | "assistant"
   content: string
+}
+
+interface HistoryItem {
+  id: number
+  title: string
+  updatedAt: string
 }
 
 const messages = ref<Message[]>([])
@@ -17,6 +25,12 @@ const isLoading = ref(false)
 const messagesContainerRef = ref<HTMLElement>()
 const textareaRef = ref<HTMLElement>()
 
+// 历史对话：左侧可折叠面板
+const historyList = ref<HistoryItem[]>([])
+const historyLoading = ref(false)
+const historyPanelCollapsed = ref(false)
+const currentHistoryId = ref<number | null>(null)
+
 function scrollToBottom() {
   nextTick(() => {
     if (messagesContainerRef.value) {
@@ -24,6 +38,76 @@ function scrollToBottom() {
     }
   })
 }
+
+/** 拉取历史对话列表（后端需传 userId 才有数据，可选 .env 配置 VITE_AI_USER_ID） */
+async function fetchHistory() {
+  historyLoading.value = true
+  try {
+    const url = AI_USER_ID != null
+      ? `${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/conversations?userId=${AI_USER_ID}`
+      : `${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/conversations`
+    const res = await fetch(url)
+    const raw = await res.text()
+    const data = raw ? JSON.parse(raw) : {}
+    const list = (data?.data ?? []) as { id: number; title: string; updatedAt: string }[]
+    historyList.value = list.map((c) => ({
+      id: c.id,
+      title: c.title || "新对话",
+      updatedAt: c.updatedAt
+    }))
+  } catch {
+    historyList.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+/** 格式化历史项时间 */
+function formatHistoryTime(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const dDate = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  if (dDate.getTime() === today.getTime()) return "今天 " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+  if (dDate.getTime() === yesterday.getTime()) return "昨天 " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+  return d.toLocaleDateString("zh-CN") + " " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+}
+
+/** 打开某条历史对话 */
+async function openHistory(id: number) {
+  if (currentHistoryId.value === id) return
+  historyLoading.value = true
+  try {
+    const res = await fetch(`${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/conversations/${id}/messages`)
+    const raw = await res.text()
+    const data = raw ? JSON.parse(raw) : {}
+    const list = (data?.data ?? []) as { role: string; content: string }[]
+    messages.value = list
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content || "" }))
+    conversationId.value = id
+    currentHistoryId.value = id
+    scrollToBottom()
+  } catch {
+    ElMessage.error("加载对话失败")
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+/** 新建对话 */
+function startNewChat() {
+  messages.value = []
+  conversationId.value = null
+  currentHistoryId.value = null
+  fetchHistory()
+}
+
+onMounted(() => {
+  fetchHistory()
+})
 
 async function sendMessage() {
   const content = input.value.trim()
@@ -74,7 +158,11 @@ async function sendMessage() {
     } else {
       const text = (data?.data?.content ?? "").trim() || "抱歉，我暂时无法回答这个问题。"
       messages.value[lastIndex].content = text
-      if (data?.data?.conversationId != null) conversationId.value = data.data.conversationId
+      if (data?.data?.conversationId != null) {
+        conversationId.value = data.data.conversationId
+        currentHistoryId.value = data.data.conversationId
+        fetchHistory()
+      }
     }
   } catch {
     messages.value[lastIndex].content = "请求失败，请检查网络或后端服务后重试。"
@@ -98,8 +186,7 @@ function clearMessages() {
     cancelButtonText: "取消",
     type: "warning"
   }).then(() => {
-    messages.value = []
-    conversationId.value = null
+    startNewChat()
   })
 }
 
@@ -116,9 +203,48 @@ function renderContent(content: string): string {
 </script>
 
 <template>
-  <div class="chat-page">
-    <!-- 顶部标题栏 -->
-    <div class="chat-header">
+  <div class="chat-layout">
+    <!-- 左侧历史对话（可折叠） -->
+    <aside class="history-aside" :class="{ collapsed: historyPanelCollapsed }">
+      <div class="history-header">
+        <el-button
+          :icon="historyPanelCollapsed ? Expand : Fold"
+          text
+          circle
+          size="small"
+          :title="historyPanelCollapsed ? '展开历史' : '收起历史'"
+          @click="historyPanelCollapsed = !historyPanelCollapsed"
+        />
+        <template v-if="!historyPanelCollapsed">
+          <span class="history-title">历史对话</span>
+          <el-button class="history-new-btn" :icon="Plus" text size="small" @click="startNewChat">新建</el-button>
+        </template>
+      </div>
+      <div v-show="!historyPanelCollapsed" class="history-list-wrap">
+        <el-scrollbar v-loading="historyLoading">
+          <ul class="history-list">
+            <li
+              v-for="item in historyList"
+              :key="item.id"
+              class="history-item"
+              :class="{ active: currentHistoryId === item.id }"
+              @click="openHistory(item.id)"
+            >
+              <span class="history-item-title">{{ item.title }}</span>
+              <span class="history-item-time">{{ formatHistoryTime(item.updatedAt) }}</span>
+            </li>
+          </ul>
+          <p v-if="!historyLoading && historyList.length === 0" class="history-empty">
+            暂无历史对话
+            <template v-if="AI_USER_ID == null">（可配置 VITE_AI_USER_ID 按用户拉取）</template>
+          </p>
+        </el-scrollbar>
+      </div>
+    </aside>
+
+    <div class="chat-page">
+      <!-- 顶部标题栏 -->
+      <div class="chat-header">
       <span class="chat-title">AI 助手</span>
       <span class="chat-subtitle">Spring Boot 转发 · 对话落库</span>
       <el-button
@@ -184,14 +310,119 @@ function renderContent(content: string): string {
         @click="sendMessage"
       />
     </div>
+    </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
-.chat-page {
+.chat-layout {
+  display: flex;
+  height: calc(100vh - 100px);
+  background: var(--el-bg-color);
+}
+
+.history-aside {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--el-border-color-lighter);
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 100px);
+  background: var(--el-bg-color-page);
+  transition: width 0.2s;
+
+  &.collapsed {
+    width: 52px;
+    min-width: 52px;
+
+    .history-header {
+      justify-content: center;
+    }
+    .history-title,
+    .history-list-wrap,
+    .history-new-btn {
+      display: none;
+    }
+  }
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  flex-shrink: 0;
+
+  .history-title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+}
+
+.history-list-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+
+  .el-scrollbar {
+    height: 100%;
+  }
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+}
+
+.history-item {
+  padding: 10px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--el-fill-color-light);
+  }
+
+  &.active {
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
+  }
+}
+
+.history-item-title {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item-time {
+  display: block;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
+}
+
+.history-empty {
+  padding: 16px 12px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  text-align: center;
+}
+
+.chat-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--el-bg-color);
 }
 

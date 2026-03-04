@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 public class AiChatController {
 
     private static final Logger log = LoggerFactory.getLogger(AiChatController.class);
-    private static final int TITLE_MAX_LEN = 80;
 
     private final String aiServiceBaseUrl;
     private final ObjectMapper objectMapper;
@@ -61,6 +60,33 @@ public class AiChatController {
     @GetMapping(value = "/chat", produces = MediaType.APPLICATION_JSON_VALUE)
     public ApiResult<Map<String, String>> chatGet() {
         return ApiResult.ok(Map.of("message", "请用 POST 发送 messages，本接口不接受 GET"));
+    }
+
+    /**
+     * 调用 AI 服务将用户首条消息总结为 8 字以内标题；失败则返回 null（沿用「新对话」）。
+     */
+    private String fetchSuggestedTitle(String firstUserMessage) {
+        if (firstUserMessage == null || firstUserMessage.isBlank()) return null;
+        try {
+            String jsonBody = objectMapper.writeValueAsString(Map.of("message", firstUserMessage));
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<byte[]> entity = new HttpEntity<>(jsonBody.getBytes(StandardCharsets.UTF_8), headers);
+            RestTemplate rest = new RestTemplate();
+            String responseBody = rest.postForObject(aiServiceBaseUrl + "/api/chat/suggest-title", entity, String.class);
+            if (responseBody == null) return null;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = objectMapper.readValue(responseBody, Map.class);
+            Object title = map != null ? map.get("title") : null;
+            if (title != null) {
+                String s = title.toString().trim();
+                if (s.length() > 8) s = s.substring(0, 8);
+                return s.isBlank() ? null : s;
+            }
+        } catch (Exception e) {
+            log.warn("[AI chat] suggest-title 调用失败: {}", e.getMessage());
+        }
+        return null;
     }
 
     /**
@@ -118,8 +144,9 @@ public class AiChatController {
                 .orElse("");
         log.info("[AI chat] 消息数: {}, conversationId: {}, 最后(user): {}", messages.size(), conversationId, lastUserContent);
 
+        boolean isNewConversation = (conversationId == null);
         AiConversation conversation;
-        if (conversationId != null) {
+        if (!isNewConversation) {
             conversation = conversationRepo.findById(conversationId).orElse(null);
             if (conversation == null) {
                 return ApiResult.fail(404, "会话不存在");
@@ -129,10 +156,7 @@ public class AiChatController {
             if (userId != null) {
                 userRepo.findById(userId).ifPresent(conversation::setUser);
             }
-            String title = lastUserContent.length() > TITLE_MAX_LEN
-                    ? lastUserContent.substring(0, TITLE_MAX_LEN) + "..."
-                    : lastUserContent;
-            conversation.setTitle(title.isEmpty() ? "新对话" : title);
+            conversation.setTitle("新对话"); // 先占位，AI 回复后再用 suggest-title 更新为 8 字内标题
             conversation = conversationRepo.save(conversation);
         }
 
@@ -169,7 +193,12 @@ public class AiChatController {
             assistantMsg.setSortOrder(nextOrder + 1);
             messageRepo.save(assistantMsg);
 
-            conversation.setTitle(conversation.getTitle());
+            if (isNewConversation) {
+                String suggestedTitle = fetchSuggestedTitle(lastUserContent);
+                if (suggestedTitle != null && !suggestedTitle.isBlank()) {
+                    conversation.setTitle(suggestedTitle);
+                }
+            }
             conversationRepo.save(conversation);
 
             log.info("[AI chat] 助手回复已存库, conversationId={}", conversation.getId());
