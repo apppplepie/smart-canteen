@@ -1,6 +1,7 @@
 package com.scs.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scs.config.CurrentUserHolder;
 import com.scs.dto.ApiResult;
 import com.scs.entity.AiConversation;
 import com.scs.entity.AiMessage;
@@ -22,6 +23,7 @@ import org.springframework.web.client.RestTemplate;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -128,7 +130,7 @@ public class AiChatController {
 
         Long conversationId = body.get("conversationId") != null ? ((Number) body.get("conversationId")).longValue() : null;
         Long userId = body.get("userId") != null ? ((Number) body.get("userId")).longValue() : null;
-        // 未传 body.userId 时从请求头 X-User-Id 取，保证新建会话也能带上当前用户 id 落库
+        // 未传 body.userId 时从请求头 X-User-Id 取
         if (userId == null && request != null) {
             String header = request.getHeader("X-User-Id");
             if (header != null && !header.isBlank()) {
@@ -138,15 +140,24 @@ public class AiChatController {
                 }
             }
         }
+        // 仍未传时：从全局解析的 token 取当前登录用户，用 username 查库得到 userId（兼容不传 token 的前端则 userId 保持 null）
+        if (userId == null) {
+            userId = CurrentUserHolder.getCurrentSessionUser(request)
+                    .flatMap(su -> userRepo.findByUsername(su.username()).map(u -> u.getId()))
+                    .orElse(null);
+        }
         // clientType: admin | screen | mobile，供 AI 服务区分 Agent 与 Tool 白名单（admin 需 RBAC）
         String clientType = body.get("clientType") != null ? body.get("clientType").toString().trim().toLowerCase() : "mobile";
         if (!List.of("admin", "screen", "mobile").contains(clientType)) {
             clientType = "mobile";
         }
-        // admin 时 role：请求体可带 role，否则按 userId 查库
+        // admin 时 role：请求体可带 role，否则按 userId 查库，再否则从当前会话用户取
         String role = body.get("role") != null ? body.get("role").toString().trim() : null;
         if (role == null && userId != null) {
             role = userRepo.findById(userId).map(u -> u.getRole() != null ? u.getRole() : "guest").orElse("guest");
+        }
+        if (role == null) {
+            role = CurrentUserHolder.getCurrentSessionUser(request).map(su -> su.role()).orElse("guest");
         }
 
         String lastUserContent = messages.stream()
@@ -159,7 +170,7 @@ public class AiChatController {
         boolean isNewConversation = (conversationId == null);
         AiConversation conversation;
         if (!isNewConversation) {
-            conversation = conversationRepo.findById(conversationId).orElse(null);
+            conversation = conversationRepo.findById(Objects.requireNonNull(conversationId)).orElse(null);
             if (conversation == null) {
                 return ApiResult.fail(404, "会话不存在");
             }
@@ -213,10 +224,11 @@ public class AiChatController {
             }
             conversationRepo.save(conversation);
 
-            log.info("[AI chat] 助手回复已存库, conversationId={}", conversation.getId());
+            Long convId = conversation.getId();
+            log.info("[AI chat] 助手回复已存库, conversationId={}", convId);
             return ApiResult.ok(Map.of(
                     "content", content,
-                    "conversationId", conversation.getId()
+                    "conversationId", convId
             ));
         } catch (HttpStatusCodeException e) {
             int status = e.getStatusCode().value();
@@ -266,6 +278,11 @@ public class AiChatController {
                 } catch (NumberFormatException ignored) {
                 }
             }
+        }
+        if (userId == null) {
+            userId = CurrentUserHolder.getCurrentSessionUser(request)
+                    .flatMap(su -> userRepo.findByUsername(su.username()).map(u -> u.getId()))
+                    .orElse(null);
         }
         List<AiConversation> list;
         if (userId != null) {

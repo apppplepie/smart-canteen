@@ -2,9 +2,18 @@
 import { marked } from "marked"
 import DOMPurify from "dompurify"
 import { Delete, Promotion, Plus, Fold, Expand } from "@element-plus/icons-vue"
+import { getToken } from "@@/utils/local-storage"
 import { useUserStore } from "@/pinia/stores/user"
 
 marked.setOptions({ gfm: true, breaks: true })
+
+/** 带登录态的请求头（与 axios 的 request 一致：Bearer Token） */
+function authHeaders(): HeadersInit {
+  const token = getToken()
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  return headers
+}
 
 const CHAT_API_BASE = (import.meta.env.VITE_CHAT_API_BASE_URL as string) || "http://localhost:8081"
 const userStore = useUserStore()
@@ -50,7 +59,7 @@ async function fetchHistory() {
     const url = AI_USER_ID != null
       ? `${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/conversations?userId=${AI_USER_ID}`
       : `${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/conversations`
-    const res = await fetch(url)
+    const res = await fetch(url, { headers: authHeaders() })
     const raw = await res.text()
     const data = raw ? JSON.parse(raw) : {}
     const list = (data?.data ?? []) as { id: number; title: string; updatedAt: string }[]
@@ -84,7 +93,7 @@ async function openHistory(id: number) {
   if (currentHistoryId.value === id) return
   historyLoading.value = true
   try {
-    const res = await fetch(`${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/conversations/${id}/messages`)
+    const res = await fetch(`${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/conversations/${id}/messages`, { headers: authHeaders() })
     const raw = await res.text()
     const data = raw ? JSON.parse(raw) : {}
     const list = (data?.data ?? []) as { role: string; content: string }[]
@@ -143,7 +152,7 @@ async function sendMessage() {
 
     const response = await fetch(`${CHAT_API_BASE.replace(/\/$/, "")}/api/ai/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify(body)
     })
 
@@ -260,7 +269,7 @@ function renderContent(content: string): string {
       <div class="chat-header">
       <span class="chat-title">AI 助手</span>
       <span class="chat-subtitle">Spring Boot 转发 · 对话落库</span>
-      <el-button
+      <!-- <el-button
         v-if="messages.length > 0"
         :icon="Delete"
         size="small"
@@ -270,7 +279,7 @@ function renderContent(content: string): string {
         @click="clearMessages"
       >
         清空对话
-      </el-button>
+      </el-button> -->
     </div>
 
     <!-- 消息列表 -->
