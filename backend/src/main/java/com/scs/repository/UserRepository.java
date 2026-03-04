@@ -18,4 +18,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Page<User> findByIsDeletedFalseAndUsernameContainingAndPhoneContaining(
             String username, String phone, Pageable pageable);
+
+    /** 模糊搜索：用户名或手机号包含关键词（供数据管理列表筛选） */
+    Page<User> findByIsDeletedFalseAndUsernameContainingOrPhoneContaining(
+            String username, String phone, Pageable pageable);
 }

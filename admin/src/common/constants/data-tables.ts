@@ -7,6 +7,8 @@ export const DATA_TABLE_TITLES: Record<string, string> = {
   order_items: "订单项",
   menu_items: "菜单项",
   agent_requests: "代理请求",
+  ai_conversations: "AI 会话",
+  ai_messages: "AI 消息",
   audit_logs: "审计日志",
   call_events: "呼叫事件",
   nutrition_logs: "营养记录",

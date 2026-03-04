@@ -312,4 +312,40 @@ INSERT INTO audit_logs (actor_id, action, object_type, object_id, details) VALUE
 -- Example update to mark an order as ready
 UPDATE orders SET status='ready' WHERE id=1;
 
+
+CREATE TABLE `ai_messages` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `conversation_id` bigint NOT NULL COMMENT '所属会话',
+  `role` enum('user','assistant','system','tool') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `content` text COLLATE utf8mb4_unicode_ci COMMENT '正文；tool 时为执行结果',
+  `tool_calls` json DEFAULT NULL COMMENT 'assistant 发起的 tool 调用列表',
+  `tool_call_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'role=tool 时对应 tool_calls[].id',
+  `suggestions` json DEFAULT NULL COMMENT '前端快捷建议 ["xxx","yyy"]',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_conversation_order` (`conversation_id`,`sort_order`),
+  KEY `idx_conversation_created` (`conversation_id`,`created_at`),
+  CONSTRAINT `fk_msg_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `ai_conversations` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 对话消息';
+
+CREATE TABLE `ai_conversations` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint DEFAULT NULL COMMENT '用户标识，未登录可空',
+  `title` varchar(256) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '会话标题，如首条问题摘要',
+  `context_summary` text COLLATE utf8mb4_unicode_ci COMMENT '超过5轮时此前对话的摘要，约500字，供带上下文回复',
+  `context_summary_message_count` int DEFAULT NULL COMMENT '摘要所覆盖的消息条数（从会话开头算），用于判断是否需重新生成摘要',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_updated` (`user_id`,`updated_at` DESC),
+  CONSTRAINT `fk_conversations_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 对话会话';
+
+
+-- 若 ai_conversations 表是之前建的（没有 context_summary），请执行下面两行迁移后再用「超过5轮」的会话测试：
+-- ALTER TABLE ai_conversations ADD COLUMN context_summary text COLLATE utf8mb4_unicode_ci COMMENT '超过5轮时此前对话的摘要，约500字' AFTER title;
+-- ALTER TABLE ai_conversations ADD COLUMN context_summary_message_count int DEFAULT NULL COMMENT '摘要所覆盖的消息条数' AFTER context_summary;
+
 -- Done
+

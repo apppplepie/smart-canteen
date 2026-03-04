@@ -10,7 +10,7 @@ from typing import Annotated
 import requests
 from dotenv import load_dotenv
 from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
@@ -198,18 +198,109 @@ def compile_agent(tools: list):
     return graph_builder.compile()
 
 
+SUMMARY_MAX_CHARS = 500
+
+
+def _messages_to_langchain(messages: list[dict]) -> list:
+    """将 [{"role":"user"/"assistant","content":"..."}] 转为 LangChain Message 列表。"""
+    out = []
+    for m in messages:
+        role = (m.get("role") or "user").strip().lower()
+        content = (m.get("content") or "").strip()
+        if role == "user":
+            out.append(HumanMessage(content=content))
+        elif role == "assistant":
+            out.append(AIMessage(content=content))
+        # system 可在此扩展
+    return out
+
+
+def summarize_messages(messages: list[dict]) -> str:
+    """
+    将一段对话总结为 500 字以内的小结。LangChain 无内置「对话摘要」配置，此处自行调用 LLM。
+    """
+    if not messages:
+        return ""
+    lines = []
+    for m in messages:
+        role = m.get("role") or "user"
+        content = (m.get("content") or "").strip()
+        if content:
+            lines.append(f"{role}: {content}")
+    if not lines:
+        return ""
+    text = "\n".join(lines)
+    prompt = f"""请将以下对话总结为一段{SUMMARY_MAX_CHARS}字以内的小结，只输出小结内容，不要「小结：」等前缀或其它说明：
+
+{text}"""
+    try:
+        llm = ChatOpenAI(
+            model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+            openai_api_key=os.getenv("DEEPSEEK_API_KEY", "").strip(),
+            openai_api_base=os.getenv("DEEPSEEK_API_BASE", "https://api.deepseek.com/v1"),
+            temperature=0.2,
+        )
+        resp = llm.invoke([HumanMessage(content=prompt)])
+        content = getattr(resp, "content", None) or ""
+        if isinstance(content, list):
+            content = " ".join(
+                (c.get("text", "") if isinstance(c, dict) else str(c) for c in content)
+            )
+        summary = (content or "").strip()[:SUMMARY_MAX_CHARS]
+        return summary
+    except Exception as e:
+        return f"（摘要生成失败: {e!s}）"[:SUMMARY_MAX_CHARS]
+
+
+def _serialize_tool_calls(msg) -> list | None:
+    """从 AIMessage 提取 tool_calls 为可 JSON 序列化的列表。"""
+    if not hasattr(msg, "tool_calls") or not msg.tool_calls:
+        return None
+    out = []
+    for tc in msg.tool_calls:
+        if hasattr(tc, "id"):
+            out.append({
+                "id": getattr(tc, "id", "") or "",
+                "name": getattr(tc, "name", "") or "",
+                "args": getattr(tc, "args", None) or {},
+            })
+        elif isinstance(tc, dict):
+            out.append({
+                "id": tc.get("id", ""),
+                "name": tc.get("name", ""),
+                "args": tc.get("args", {}),
+            })
+    return out if out else None
+
+
 def process_message(
-    user_message: str,
+    messages: list[dict],
+    context_summary: str | None = None,
     client_type: str = CLIENT_MOBILE,
     role: str | None = None,
-) -> str:
+) -> dict:
     """
     统一入口：根据 clientType 与（admin）role 选工具，执行 Agent 或仅 LLM 回复。
-    - client_type: "admin" | "screen" | "mobile"
-    - role: 仅当 client_type=admin 时使用，用于 RBAC 白名单；缺省视为 guest。
+    messages: 最近几轮对话 [{"role":"user"/"assistant","content":"..."}]，至少一条 user。
+    context_summary: 可选，此前对话的 500 字内小结，会作为系统上下文注入。
+    返回 {"content": str, "tool_calls": list | None, "suggestions": list[str] | None}。
     """
-    if not user_message or not user_message.strip():
-        return "请说一句你想查的内容，例如：查一下用户 1 的信息、用户 2 的订单。"
+    empty = {"content": "", "tool_calls": None, "suggestions": None}
+    if not messages:
+        empty["content"] = "请说一句你想查的内容，例如：查一下用户 1 的信息、用户 2 的订单。"
+        return empty
+
+    last_user = next(
+        (
+            (m.get("content") or "").strip()
+            for m in reversed(messages)
+            if (m.get("role") or "").strip().lower() == "user"
+        ),
+        "",
+    )
+    if not last_user:
+        empty["content"] = "请说一句你想查的内容。"
+        return empty
 
     client_type = (client_type or CLIENT_MOBILE).strip().lower()
     if client_type not in CLIENT_TYPES:
@@ -219,19 +310,46 @@ def process_message(
     agent = compile_agent(tools)
 
     if agent is None:
-        # admin 且无权限工具时（如 guest）：仅文字回复，不查库
         if client_type == CLIENT_ADMIN:
-            return "当前角色没有数据查询权限，请使用管理员账号登录后再试。"
-        return "请说一句你想查的内容。"
+            empty["content"] = "当前角色没有数据查询权限，请使用管理员账号登录后再试。"
+        else:
+            empty["content"] = "请说一句你想查的内容。"
+        return empty
 
-    state = agent.invoke({"messages": [HumanMessage(content=user_message.strip())]})
+    # 构建发给 Agent 的消息：可选小结 + 最近几轮
+    lc_messages = []
+    if context_summary and context_summary.strip():
+        lc_messages.append(
+            SystemMessage(content=f"【此前对话摘要】\n{context_summary.strip()}\n\n【以下为最近对话】")
+        )
+    lc_messages.extend(_messages_to_langchain(messages))
+
+    state = agent.invoke({"messages": lc_messages})
     messages = state["messages"]
     if not messages:
-        return "没有收到回复。"
-    last = messages[-1]
-    content = getattr(last, "content", None) or ""
-    if isinstance(content, list):
-        content = " ".join(
-            (c.get("text", "") if isinstance(c, dict) else str(c) for c in content)
-        )
-    return (content or "（无文本回复）").strip()
+        empty["content"] = "没有收到回复。"
+        return empty
+
+    content = ""
+    tool_calls = None
+    for m in reversed(messages):
+        if hasattr(m, "content") and m.content and not (getattr(m, "tool_calls", None)):
+            content = m.content
+            if isinstance(content, list):
+                content = " ".join(
+                    (c.get("text", "") if isinstance(c, dict) else str(c) for c in content)
+                )
+            content = (content or "").strip()
+            break
+    if not content:
+        content = "（无文本回复）"
+    for m in messages:
+        tc = _serialize_tool_calls(m)
+        if tc:
+            tool_calls = tc if tool_calls is None else (tool_calls + tc)
+
+    return {
+        "content": content,
+        "tool_calls": tool_calls,
+        "suggestions": None,  # 可后续接入：根据回复生成 2～3 条追问建议
+    }

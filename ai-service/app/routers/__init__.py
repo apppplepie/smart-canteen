@@ -23,6 +23,8 @@ TITLE_MAX_LEN = 8
 
 class ChatResponse(BaseModel):
     content: str
+    tool_calls: list | None = None  # assistant 发起的 tool 调用列表
+    suggestions: list[str] | None = None  # 前端快捷建议
 
 
 class SuggestTitleBody(BaseModel):
@@ -31,6 +33,14 @@ class SuggestTitleBody(BaseModel):
 
 class SuggestTitleResponse(BaseModel):
     title: str
+
+
+class SummarizeBody(BaseModel):
+    messages: list[dict] = []  # [{"role": "user"|"assistant", "content": "..."}]
+
+
+class SummarizeResponse(BaseModel):
+    summary: str
 
 
 api_router = APIRouter()
@@ -81,18 +91,39 @@ async def chat(request: Request) -> ChatResponse:
     if not last_user:
         raise HTTPException(status_code=422, detail="messages 中需至少有一条 user 消息")
 
-    # clientType: admin | screen | mobile（缺省 mobile）；admin 时 role 由后端传入，用于 RBAC + Tool 白名单
+    context_summary = req.get("context_summary") or req.get("contextSummary")
+    if isinstance(context_summary, str) and not context_summary.strip():
+        context_summary = None
+
     client_type = (req.get("clientType") or "mobile").strip().lower()
     if client_type not in ("admin", "screen", "mobile"):
         client_type = "mobile"
-    role = req.get("role")  # 仅 admin 使用，Spring Boot 根据 userId 解析后传入
+    role = req.get("role")
 
     from app.ai_agent import process_message
-    content = await asyncio.to_thread(process_message, last_user, client_type, role)
+    result = await asyncio.to_thread(process_message, messages, context_summary, client_type, role)
+    if isinstance(result, str):
+        result = {"content": result, "tool_calls": None, "suggestions": None}
+    content = (result.get("content") or "").strip() or "（无文本回复）"
+    tool_calls = result.get("tool_calls")
+    suggestions = result.get("suggestions")
 
     print("[Agent 回复]", content[:300] + ("..." if len(content) > 300 else ""), flush=True)
     logging.info("[Agent 回复] %s", content if len(content) <= 500 else content[:500] + "...")
-    return ChatResponse(content=content)
+    return ChatResponse(content=content, tool_calls=tool_calls, suggestions=suggestions)
+
+
+@api_router.post("/chat/summarize", response_model=SummarizeResponse)
+async def summarize_conversation(body: SummarizeBody) -> SummarizeResponse:
+    """将一段对话总结为 500 字以内的小结，供超过 5 轮时带上下文回复。"""
+    if not DEEPSEEK_API_KEY:
+        raise HTTPException(status_code=503, detail="DEEPSEEK_API_KEY not configured")
+    messages = body.messages or []
+    if not messages:
+        return SummarizeResponse(summary="")
+    from app.ai_agent import summarize_messages
+    summary = await asyncio.to_thread(summarize_messages, messages)
+    return SummarizeResponse(summary=summary or "")
 
 
 @api_router.post("/chat/suggest-title", response_model=SuggestTitleResponse)

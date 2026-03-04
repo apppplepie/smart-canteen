@@ -1,5 +1,6 @@
 package com.scs.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -13,7 +14,11 @@ public class AiMessage {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id", nullable = false)
+    @JsonIgnore
     private AiConversation conversation;
+
+    @Transient
+    private Long conversationId;
 
     @Column(nullable = false, length = 32)
     private String role; // user, assistant, system, tool
@@ -27,7 +32,7 @@ public class AiMessage {
     @Column(name = "tool_call_id", length = 64)
     private String toolCallId;
 
-    @Column(columnDefinition = "JSON")
+    @Column(name = "suggestions", columnDefinition = "JSON")
     private String suggestions;
 
     @Column(name = "sort_order", nullable = false)
@@ -45,6 +50,8 @@ public class AiMessage {
     public void setId(Long id) { this.id = id; }
     public AiConversation getConversation() { return conversation; }
     public void setConversation(AiConversation conversation) { this.conversation = conversation; }
+    public Long getConversationId() { return conversationId != null ? conversationId : (conversation != null ? conversation.getId() : null); }
+    public void setConversationId(Long conversationId) { this.conversationId = conversationId; }
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
     public String getContent() { return content; }

@@ -20,13 +20,16 @@ const columns = ref<string[]>([])
 const dialogVisible = ref(false)
 const formData = ref<Record<string, unknown>>({})
 const isEdit = ref(false)
+/** 搜索关键词（模糊匹配，后端按表支持如 users 表按用户名/手机号） */
+const searchKeyword = ref("")
 
 function getList() {
   if (!tableName.value) return
   loading.value = true
   getDataListApi(tableName.value, {
     currentPage: paginationData.currentPage,
-    size: paginationData.pageSize
+    size: paginationData.pageSize,
+    keyword: searchKeyword.value.trim() || undefined
   }).then(({ data }) => {
     paginationData.total = data.total
     tableData.value = data.list || []
@@ -99,7 +102,15 @@ function submitForm() {
   })
 }
 
-watch(tableName, getList, { immediate: true })
+function onSearch() {
+  paginationData.currentPage = 1
+  getList()
+}
+
+watch(tableName, () => {
+  searchKeyword.value = ""
+  getList()
+}, { immediate: true })
 watch([() => paginationData.currentPage, () => paginationData.pageSize], getList)
 </script>
 
@@ -108,7 +119,15 @@ watch([() => paginationData.currentPage, () => paginationData.pageSize], getList
     <div class="mb-4 flex items-center gap-2">
       <span class="text-lg font-medium">{{ pageTitle }}</span>
     </div>
-    <div class="mb-4 flex gap-2">
+    <div class="mb-4 flex flex-wrap items-center gap-2">
+      <el-input
+        v-model="searchKeyword"
+        placeholder="关键词模糊搜索"
+        clearable
+        class="w-56"
+        @keyup.enter="onSearch"
+      />
+      <el-button type="primary" @click="onSearch">搜索</el-button>
       <el-button type="primary" :icon="CirclePlus" @click="handleAdd">
         新增
       </el-button>

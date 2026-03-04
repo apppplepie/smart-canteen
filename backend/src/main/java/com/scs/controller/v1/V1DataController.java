@@ -34,6 +34,8 @@ public class V1DataController {
     private final SensorLogRepository sensorLogRepo;
     private final StockMovementRepository stockMovementRepo;
     private final TestReportRepository testReportRepo;
+    private final AiConversationRepository aiConversationRepo;
+    private final AiMessageRepository aiMessageRepo;
 
     private final Map<String, JpaRepository<?, Long>> repoMap = new HashMap<>();
     private final Map<String, Class<?>> entityClassMap = new HashMap<>();
@@ -45,7 +47,8 @@ public class V1DataController {
                             AuditLogRepository auditLogRepo, CallEventRepository callEventRepo,
                             NutritionLogRepository nutritionLogRepo, QueueEntryRepository queueEntryRepo,
                             RetainedSampleRepository retainedSampleRepo, SensorLogRepository sensorLogRepo,
-                            StockMovementRepository stockMovementRepo, TestReportRepository testReportRepo) {
+                            StockMovementRepository stockMovementRepo, TestReportRepository testReportRepo,
+                            AiConversationRepository aiConversationRepo, AiMessageRepository aiMessageRepo) {
         this.objectMapper = objectMapper;
         this.userRepo = userRepo;
         this.vendorRepo = vendorRepo;
@@ -62,6 +65,8 @@ public class V1DataController {
         this.sensorLogRepo = sensorLogRepo;
         this.stockMovementRepo = stockMovementRepo;
         this.testReportRepo = testReportRepo;
+        this.aiConversationRepo = aiConversationRepo;
+        this.aiMessageRepo = aiMessageRepo;
     }
 
     @PostConstruct
@@ -81,6 +86,8 @@ public class V1DataController {
         put("sensor_logs", sensorLogRepo, SensorLog.class);
         put("stock_movements", stockMovementRepo, StockMovement.class);
         put("test_reports", testReportRepo, TestReport.class);
+        put("ai_conversations", aiConversationRepo, AiConversation.class);
+        put("ai_messages", aiMessageRepo, AiMessage.class);
     }
 
     private void put(String table, JpaRepository<?, Long> repo, Class<?> entityClass) {
@@ -92,12 +99,15 @@ public class V1DataController {
     public ApiResult<Map<String, Object>> list(
             @PathVariable String table,
             @RequestParam(defaultValue = "1") int currentPage,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword) {
         int pageIndex = Math.max(0, currentPage - 1);
         int pageSize = Math.min(100, size);
         var pageRequest = PageRequest.of(pageIndex, pageSize);
         if ("users".equals(table)) {
-            var page = userRepo.findByIsDeletedFalse(pageRequest);
+            var page = (keyword != null && !keyword.isBlank())
+                    ? userRepo.findByIsDeletedFalseAndUsernameContainingOrPhoneContaining(keyword.trim(), keyword.trim(), pageRequest)
+                    : userRepo.findByIsDeletedFalse(pageRequest);
             return ApiResult.ok(Map.<String, Object>of("list", page.getContent(), "total", page.getTotalElements()));
         }
         JpaRepository<?, Long> repo = repoMap.get(table);
@@ -180,6 +190,11 @@ public class V1DataController {
                 s.setCreatedAt(e.getCreatedAt());
             } else if (entity instanceof TestReport t && existing instanceof TestReport e) {
                 t.setCreatedAt(e.getCreatedAt());
+            } else if (entity instanceof AiConversation a && existing instanceof AiConversation e) {
+                a.setCreatedAt(e.getCreatedAt());
+                a.setUpdatedAt(e.getUpdatedAt());
+            } else if (entity instanceof AiMessage a && existing instanceof AiMessage e) {
+                a.setCreatedAt(e.getCreatedAt());
             }
         } catch (Exception ignored) {}
     }
@@ -213,6 +228,10 @@ public class V1DataController {
             if (e.getVendorId() != null) vendorRepo.findById(e.getVendorId()).ifPresent(e::setVendor);
         } else if (entity instanceof TestReport e) {
             if (e.getVendorId() != null) vendorRepo.findById(e.getVendorId()).ifPresent(e::setVendor);
+        } else if (entity instanceof AiConversation e) {
+            if (e.getUserId() != null) userRepo.findById(e.getUserId()).ifPresent(e::setUser);
+        } else if (entity instanceof AiMessage e) {
+            if (e.getConversationId() != null) aiConversationRepo.findById(e.getConversationId()).ifPresent(e::setConversation);
         }
     }
 }

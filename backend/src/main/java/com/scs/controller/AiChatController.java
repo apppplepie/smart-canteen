@@ -30,12 +30,17 @@ import java.util.stream.Collectors;
 /**
  * AI 对话：前端 POST /api/ai/chat 发消息；Spring Boot 存库 → 转发 FastAPI → 存助手回复 → 返回。
  * 数据流：先存用户消息 → 调 FastAPI → 成功后再存助手消息并更新会话时间。
+ * 超过 5 轮时：此前对话生成约 500 字小结落库，每次只带「小结 + 最近 5 轮」发给大模型。
  */
 @RestController
 @RequestMapping("/api/ai")
 public class AiChatController {
 
     private static final Logger log = LoggerFactory.getLogger(AiChatController.class);
+
+    /** 发给大模型的最近轮数（每轮 = 1 user + 1 assistant） */
+    private static final int RECENT_ROUNDS = 5;
+    private static final int RECENT_MESSAGE_COUNT = RECENT_ROUNDS * 2;
 
     private final String aiServiceBaseUrl;
     private final ObjectMapper objectMapper;
@@ -91,6 +96,38 @@ public class AiChatController {
             log.warn("[AI chat] suggest-title 调用失败: {}", e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * 调用 AI 服务将一段对话总结为约 500 字小结；失败则返回空字符串。
+     */
+    private String fetchConversationSummary(List<Map<String, String>> oldMessages) {
+        if (oldMessages == null || oldMessages.isEmpty()) return "";
+        try {
+            String jsonBody = objectMapper.writeValueAsString(Map.of("messages", oldMessages));
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<byte[]> entity = new HttpEntity<>(jsonBody.getBytes(StandardCharsets.UTF_8), headers);
+            RestTemplate rest = new RestTemplate();
+            String responseBody = rest.postForObject(aiServiceBaseUrl + "/api/chat/summarize", entity, String.class);
+            if (responseBody == null) {
+                log.warn("[AI chat] summarize 返回 body 为空");
+                return "";
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = objectMapper.readValue(responseBody, Map.class);
+            Object summary = map != null ? map.get("summary") : null;
+            String result = summary != null ? summary.toString().trim() : "";
+            if (result.isEmpty()) {
+                log.warn("[AI chat] summarize 返回无 summary 或为空, responseKeys={}", map != null ? map.keySet() : "null");
+            } else {
+                log.info("[AI chat] summarize 成功, 摘要长度={}", result.length());
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("[AI chat] summarize 调用失败: {}", e.getMessage());
+            return "";
+        }
     }
 
     /**
@@ -192,9 +229,41 @@ public class AiChatController {
         messageRepo.save(userMsg);
 
         try {
-            Map<String, Object> forwardBody = new java.util.HashMap<>(Map.of("messages", messages, "clientType", clientType));
+            List<AiMessage> allMessages = messageRepo.findByConversation_IdOrderBySortOrderAscCreatedAtAsc(conversation.getId());
+            List<Map<String, String>> historyMaps = allMessages.stream()
+                    .filter(m -> "user".equals(m.getRole()) || "assistant".equals(m.getRole()))
+                    .map(m -> Map.<String, String>of("role", m.getRole(), "content", m.getContent() != null ? m.getContent() : ""))
+                    .collect(Collectors.toList());
+
+            String contextSummary = conversation.getContextSummary();
+            Integer summaryCount = conversation.getContextSummaryMessageCount();
+            if (historyMaps.size() > RECENT_MESSAGE_COUNT) {
+                int oldCount = historyMaps.size() - RECENT_MESSAGE_COUNT;
+                if (contextSummary == null || contextSummary.isEmpty() || summaryCount == null || summaryCount != oldCount) {
+                    log.info("[AI chat] 需要摘要: conversationId={}, 总消息数={}, 待摘要条数={}", conversation.getId(), historyMaps.size(), oldCount);
+                    List<Map<String, String>> toSummarize = historyMaps.subList(0, oldCount);
+                    contextSummary = fetchConversationSummary(toSummarize);
+                    if (contextSummary != null && !contextSummary.isEmpty()) {
+                        conversation.setContextSummary(contextSummary);
+                        conversation.setContextSummaryMessageCount(oldCount);
+                        conversationRepo.save(conversation);
+                        log.info("[AI chat] 已生成并落库 context_summary, conversationId={}, 覆盖消息数={}", conversation.getId(), oldCount);
+                    } else {
+                        log.warn("[AI chat] 摘要生成为空或失败，未写入 context_summary, conversationId={}, 待摘要消息数={}", conversation.getId(), oldCount);
+                    }
+                }
+            }
+
+            List<Map<String, String>> messagesToSend = historyMaps.size() <= RECENT_MESSAGE_COUNT
+                    ? historyMaps
+                    : historyMaps.subList(historyMaps.size() - RECENT_MESSAGE_COUNT, historyMaps.size());
+
+            Map<String, Object> forwardBody = new java.util.HashMap<>(Map.of("messages", messagesToSend, "clientType", clientType));
             if (role != null && !role.isBlank()) {
                 forwardBody.put("role", role);
+            }
+            if (contextSummary != null && !contextSummary.isEmpty()) {
+                forwardBody.put("context_summary", contextSummary);
             }
             String jsonBody = objectMapper.writeValueAsString(forwardBody);
             HttpHeaders headers = new HttpHeaders();
@@ -214,6 +283,20 @@ public class AiChatController {
             assistantMsg.setRole("assistant");
             assistantMsg.setContent(content);
             assistantMsg.setSortOrder(nextOrder + 1);
+            if (response != null) {
+                Object toolCallsObj = response.get("tool_calls");
+                if (toolCallsObj != null && (toolCallsObj instanceof List<?> list) && !list.isEmpty()) {
+                    try {
+                        assistantMsg.setToolCalls(objectMapper.writeValueAsString(toolCallsObj));
+                    } catch (Exception ignored) {}
+                }
+                Object suggestionsObj = response.get("suggestions");
+                if (suggestionsObj != null && (suggestionsObj instanceof List<?> list) && !list.isEmpty()) {
+                    try {
+                        assistantMsg.setSuggestions(objectMapper.writeValueAsString(suggestionsObj));
+                    } catch (Exception ignored) {}
+                }
+            }
             messageRepo.save(assistantMsg);
 
             if (isNewConversation) {
@@ -322,6 +405,13 @@ public class AiChatController {
                             @SuppressWarnings("unchecked")
                             List<String> sug = objectMapper.readValue(m.getSuggestions(), List.class);
                             map.put("suggestions", sug);
+                        } catch (Exception ignored) {}
+                    }
+                    if (m.getToolCalls() != null && !m.getToolCalls().isEmpty()) {
+                        try {
+                            @SuppressWarnings("unchecked")
+                            List<Map<String, Object>> tc = objectMapper.readValue(m.getToolCalls(), List.class);
+                            map.put("tool_calls", tc);
                         } catch (Exception ignored) {}
                     }
                     return map;
