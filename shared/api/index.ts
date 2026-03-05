@@ -35,6 +35,8 @@ export * from "./vendors";
 export * from "./menuItems";
 export * from "./posts";
 export * from "./orders";
+export * from "./lostItems";
+export * from "./foundItems";
 export * from "./orderItems";
 export * from "./queueEntries";
 export * from "./testReports";

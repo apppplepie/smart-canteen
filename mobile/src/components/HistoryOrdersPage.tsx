@@ -6,6 +6,7 @@ import { listOrdersByUser } from "../api/orders";
 import { listVendors } from "../api/vendors";
 import { formatRelativeTime } from "../lib/utils";
 import { getBaseUrl } from "../api/client";
+import { historyOrdersFallbackMock } from "../mocks/historyOrders";
 
 type OrderRow = {
   id: number;
@@ -19,12 +20,6 @@ type OrderRow = {
   totalAmount: number;
 };
 
-const FALLBACK_ORDERS: OrderRow[] = [
-  { id: 1, name: "健康轻食沙拉", time: "昨天 12:30", price: "28.00", status: "已完成", image: "https://picsum.photos/seed/m2/100/100", items: "招牌鸡胸肉沙拉 x1", totalAmount: 28 },
-  { id: 2, name: "日式咖喱屋", time: "周二 18:15", price: "32.50", status: "已完成", image: "https://picsum.photos/seed/m4/100/100", items: "炸猪排咖喱饭 x1", totalAmount: 32.5 },
-  { id: 3, name: "川香麻辣烫", time: "周一 12:00", price: "18.50", status: "已完成", image: "https://picsum.photos/seed/m1/100/100", items: "自选麻辣烫 x1", totalAmount: 18.5 },
-];
-
 export function HistoryOrdersPage({
   onBack,
   userId,
@@ -34,7 +29,7 @@ export function HistoryOrdersPage({
   userId?: number;
   onSelectOrder?: (order: { vendorId?: number; totalAmount: number; vendorName?: string; image?: string }) => void;
 }) {
-  const [orders, setOrders] = useState<OrderRow[]>(FALLBACK_ORDERS);
+  const [orders, setOrders] = useState<OrderRow[]>(historyOrdersFallbackMock);
   const [loading, setLoading] = useState(!!getBaseUrl());
   const [search, setSearch] = useState("");
 
@@ -62,9 +57,9 @@ export function HistoryOrdersPage({
           vendorId: o.vendorId,
           totalAmount: Number(o.totalAmount),
         }));
-        setOrders(rows.length ? rows : FALLBACK_ORDERS);
+        setOrders(rows.length ? rows : historyOrdersFallbackMock);
       } catch {
-        if (!cancelled) setOrders(FALLBACK_ORDERS);
+        if (!cancelled) setOrders(historyOrdersFallbackMock);
       } finally {
         if (!cancelled) setLoading(false);
       }

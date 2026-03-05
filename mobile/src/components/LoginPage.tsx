@@ -2,23 +2,54 @@ import React, { useState } from "react";
 import { motion } from "motion/react";
 import { ChevronLeft, Sparkles, User, Lock } from "lucide-react";
 import { THEME } from "../config/theme";
+import { login, getCurrentUser, isApiConfigured } from "../api/auth";
+
+export type LoginUser = {
+  name: string;
+  id: string;
+  avatar: string;
+  userId?: number;
+  token?: string;
+};
 
 interface LoginPageProps {
   onBack: () => void;
-  onLogin: (user: any) => void;
+  onLogin: (user: LoginUser) => void;
 }
 
 export function LoginPage({ onBack, onLogin }: LoginPageProps) {
-  const [studentId, setStudentId] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (studentId && password) {
-      // Mock login success; userId 用于调用后端接口（需与 backend users 表一致，默认 1）
+    setError("");
+    if (!username.trim() || !password) return;
+
+    if (isApiConfigured()) {
+      setLoading(true);
+      try {
+        const { token } = await login({ username: username.trim(), password });
+        const me = await getCurrentUser(token);
+        onLogin({
+          name: me.username,
+          id: username.trim(),
+          avatar: "https://picsum.photos/seed/u" + (me.id ?? username) + "/100/100",
+          userId: me.id,
+          token,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "登录失败");
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // 未配置后端时 mock：学生/老师均可用于本地调试
       onLogin({
         name: "干饭王",
-        id: studentId,
+        id: username.trim(),
         avatar: "https://picsum.photos/seed/u1/100/100",
         userId: 1,
       });
@@ -49,16 +80,22 @@ export function LoginPage({ onBack, onLogin }: LoginPageProps) {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
+          {error ? (
+            <div className="text-sm text-red-500 bg-red-50 border border-red-100 rounded-2xl py-3 px-4">
+              {error}
+            </div>
+          ) : null}
           <div className="space-y-4">
             <div className="relative">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="请输入学号"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
+                placeholder="请输入学号/工号"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#FF6B6B]/20 focus:border-[#FF6B6B] transition-all"
                 required
+                autoComplete="username"
               />
             </div>
             <div className="relative">
@@ -70,17 +107,18 @@ export function LoginPage({ onBack, onLogin }: LoginPageProps) {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#FF6B6B]/20 focus:border-[#FF6B6B] transition-all"
                 required
+                autoComplete="current-password"
               />
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={!studentId || !password}
+            disabled={!username.trim() || !password || loading}
             className="w-full text-white py-4 rounded-2xl font-bold text-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md active:scale-[0.98]"
             style={{ backgroundColor: THEME.colors.primary }}
           >
-            登录
+            {loading ? "登录中…" : "登录"}
           </button>
         </form>
       </div>

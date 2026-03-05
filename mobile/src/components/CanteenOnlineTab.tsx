@@ -81,9 +81,9 @@ export function CanteenOnlineTab({ user }: { user?: { userId?: number } | null }
             user={user}
           />
         )}
-        {activeService === "feedback" && <FeedbackPage onBack={() => setActiveService(null)} />}
-        {activeService === "lost" && <LostItemPage onBack={() => setActiveService(null)} />}
-        {activeService === "found" && <FoundItemPage onBack={() => setActiveService(null)} />}
+        {activeService === "feedback" && <FeedbackPage onBack={() => setActiveService(null)} userId={user?.userId} />}
+        {activeService === "lost" && <LostItemPage onBack={() => setActiveService(null)} userId={user?.userId} />}
+        {activeService === "found" && <FoundItemPage onBack={() => setActiveService(null)} userId={user?.userId} />}
       </AnimatePresence>
 
       {/* Header */}
