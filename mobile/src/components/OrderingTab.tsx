@@ -6,6 +6,7 @@ import { cn } from "../lib/utils";
 import { THEME } from "../config/theme";
 import { listVendors } from "../api/vendors";
 import { getBaseUrl } from "../api/client";
+import { orderingMerchantsFallbackMock } from "../mocks/orderingMerchants";
 
 type Merchant = {
   id: number;
@@ -19,18 +20,10 @@ type Merchant = {
   popular: boolean;
 };
 
-/** Mock 商家（API 连不上时回退），image 用 picsum 占位 */
-const FALLBACK_MERCHANTS: Merchant[] = [
-  { id: 1, name: "川香麻辣烫", rating: 4.8, reviews: 1205, time: "10-15 min", distance: "1F 东区", tags: ["麻辣鲜香", "自选"], image: "https://picsum.photos/seed/m1/400/300", popular: true },
-  { id: 2, name: "健康轻食沙拉", rating: 4.9, reviews: 890, time: "5-10 min", distance: "2F 西区", tags: ["低脂", "减脂餐"], image: "https://picsum.photos/seed/m2/400/300", popular: false },
-  { id: 3, name: "老北京炸酱面", rating: 4.6, reviews: 2300, time: "15-20 min", distance: "1F 中区", tags: ["面食", "地道"], image: "https://picsum.photos/seed/m3/400/300", popular: true },
-  { id: 4, name: "日式咖喱屋", rating: 4.7, reviews: 650, time: "10-15 min", distance: "2F 东区", tags: ["咖喱", "日料"], image: "https://picsum.photos/seed/m4/400/300", popular: false },
-];
-
 export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [activeTab, setActiveTab] = useState<"推荐" | "最快">("推荐");
-  const [merchants, setMerchants] = useState<Merchant[]>(FALLBACK_MERCHANTS);
+  const [merchants, setMerchants] = useState<Merchant[]>(orderingMerchantsFallbackMock);
   const [loading, setLoading] = useState(!!getBaseUrl());
 
   useEffect(() => {
@@ -62,9 +55,9 @@ export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
             popular: v.id % 2 === 1,
           };
         });
-        setMerchants(mapped.length ? mapped : FALLBACK_MERCHANTS);
+        setMerchants(mapped.length ? mapped : orderingMerchantsFallbackMock);
       } catch {
-        if (!cancelled) setMerchants(FALLBACK_MERCHANTS);
+        if (!cancelled) setMerchants(orderingMerchantsFallbackMock);
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -18,6 +18,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { THEME } from "../config/theme";
+import { aiAssistantSuggestionsMock } from "../mocks/aiAssistant";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -28,19 +29,12 @@ interface Message {
   suggestions?: string[];
 }
 
-const INITIAL_SUGGESTIONS = [
-  "推荐低脂减脂餐",
-  "现在哪个档口排队最少？",
-  "想吃点辣的，有什么推荐？",
-  "今天有什么特价菜？",
-];
-
 const WELCOME_MSG: Message = {
   id: "welcome",
   role: "assistant",
   content:
     "你好！我是你的食堂AI点餐助手 🤖\n\n不知道吃什么？时间太紧？或者想找点特定口味的菜品？随时问我！",
-  suggestions: INITIAL_SUGGESTIONS,
+  suggestions: aiAssistantSuggestionsMock,
 };
 
 function formatConversationTime(iso: string): string {

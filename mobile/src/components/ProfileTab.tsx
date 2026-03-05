@@ -30,14 +30,7 @@ import {
 import { LoginPage } from "./LoginPage";
 import { HistoryOrdersPage } from "./HistoryOrdersPage";
 import { MyPostsPage } from "./MyPostsPage";
-
-const data = [
-  { time: "11:00", wait: 5, queue: 10 },
-  { time: "11:30", wait: 15, queue: 35 },
-  { time: "12:00", wait: 25, queue: 80 },
-  { time: "12:30", wait: 20, queue: 60 },
-  { time: "13:00", wait: 10, queue: 20 },
-];
+import { profileChartDataMock } from "../mocks/profileChart";
 
 export type ProfileUser = { name: string; id: string; avatar: string; userId?: number; token?: string } | null;
 
@@ -321,7 +314,7 @@ export function ProfileTab({
                 <div className="h-24 w-full mt-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
-                      data={data}
+                      data={profileChartDataMock}
                       margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
                     >
                       <defs>

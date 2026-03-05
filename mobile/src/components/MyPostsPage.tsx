@@ -6,14 +6,10 @@ import { listPostsByUser } from "../api";
 import { postToSharedPost } from "../api/mapPost";
 import { getBaseUrl } from "../api/client";
 import type { SharedPost } from "./SharedPostDetail";
-
-const FALLBACK: SharedPost[] = [
-  { id: 1, content: "今天一餐的麻辣烫太绝了！加了双份肥牛，汤底浓郁，简直是打工人的灵魂救赎 🍜✨", image: "https://picsum.photos/seed/p1/400/500", likes: 128, comments: 32, time: "2小时前" },
-  { id: 2, content: "食堂新出的抹茶毛巾卷，口感绵密，抹茶味超浓郁，下午茶首选🍵", image: "https://picsum.photos/seed/p4/400/600", likes: 412, comments: 88, time: "昨天" },
-];
+import { myPostsFallbackMock } from "../mocks/myPosts";
 
 export function MyPostsPage({ onBack, user }: { onBack: () => void; user: { name: string; id: string; avatar: string; userId?: number } }) {
-  const [posts, setPosts] = useState<SharedPost[]>(FALLBACK);
+  const [posts, setPosts] = useState<SharedPost[]>(myPostsFallbackMock);
   const [loading, setLoading] = useState(!!getBaseUrl());
 
   useEffect(() => {
@@ -29,9 +25,9 @@ export function MyPostsPage({ onBack, user }: { onBack: () => void; user: { name
         const list = await listPostsByUser(uid);
         if (cancelled) return;
         const mapped = list.map((p) => postToSharedPost(p, undefined, base.replace(/\/$/, "")));
-        setPosts(mapped.length ? mapped : FALLBACK);
+        setPosts(mapped.length ? mapped : myPostsFallbackMock);
       } catch {
-        if (!cancelled) setPosts(FALLBACK);
+        if (!cancelled) setPosts(myPostsFallbackMock);
       } finally {
         if (!cancelled) setLoading(false);
       }

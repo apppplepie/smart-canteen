@@ -6,6 +6,7 @@ import { HistoryOrdersPage } from "./HistoryOrdersPage";
 import { createPost } from "../api";
 import { listOrdersByUser } from "../api/orders";
 import { getBaseUrl } from "../api/client";
+import { publishPageDefaultOrderMock } from "../mocks/publishPage";
 
 export function PublishPage({
   onBack,
@@ -21,11 +22,7 @@ export function PublishPage({
   const [rating, setRating] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<{ name: string; items: string; image: string; orderId?: number; vendorId?: number }>({
-    name: "健康轻食沙拉",
-    items: "招牌鸡胸肉沙拉",
-    image: "https://picsum.photos/seed/m2/100/100",
-  });
+  const [selectedOrder, setSelectedOrder] = useState<{ name: string; items: string; image: string; orderId?: number; vendorId?: number }>({ ...publishPageDefaultOrderMock });
 
   const handlePublish = async () => {
     if (!content.trim()) return;

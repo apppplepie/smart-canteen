@@ -14,6 +14,7 @@ import { cn } from "../lib/utils";
 import { CheckoutPage } from "./CheckoutPage";
 import { listMenuItemsByVendor } from "../api/menuItems";
 import { getBaseUrl } from "../api/client";
+import { merchantMenuFallbackMock } from "../mocks/merchantMenu";
 
 type MenuItemRow = {
   id: number;
@@ -23,12 +24,6 @@ type MenuItemRow = {
   image: string;
   popular: boolean;
 };
-
-const FALLBACK_MENU: MenuItemRow[] = [
-  { id: 1, name: "招牌麻辣烫", price: 18, desc: "包含牛丸、鱼豆腐、生菜等10种配菜", image: "https://picsum.photos/seed/d1/200/200", popular: true },
-  { id: 2, name: "番茄肥牛面", price: 22, desc: "浓郁番茄汤底，精选肥牛卷", image: "https://picsum.photos/seed/d2/200/200", popular: true },
-  { id: 3, name: "金汤酸菜鱼", price: 28, desc: "酸辣开胃，无骨鱼片", image: "https://picsum.photos/seed/d3/200/200", popular: false },
-];
 
 interface MerchantPageProps {
   merchant: { id: number; name: string; image?: string; rating?: number; time?: string; distance?: string };
@@ -41,14 +36,14 @@ export function MerchantPage({ merchant, onBack, user }: MerchantPageProps) {
   const [cart, setCart] = useState<Record<number, number>>({});
   const [activeCategory, setActiveCategory] = useState("招牌");
   const [showCheckout, setShowCheckout] = useState(false);
-  const [menu, setMenu] = useState<MenuItemRow[]>(FALLBACK_MENU);
+  const [menu, setMenu] = useState<MenuItemRow[]>(merchantMenuFallbackMock);
   const [menuLoading, setMenuLoading] = useState(!!getBaseUrl());
 
   useEffect(() => {
     const base = getBaseUrl();
     if (!base || !merchant?.id) {
       setMenuLoading(false);
-      setMenu(FALLBACK_MENU);
+      setMenu(merchantMenuFallbackMock);
       return;
     }
     let cancelled = false;
@@ -73,9 +68,9 @@ export function MerchantPage({ merchant, onBack, user }: MerchantPageProps) {
               popular: false,
             };
           });
-        setMenu(mapped.length ? mapped : FALLBACK_MENU);
+        setMenu(mapped.length ? mapped : merchantMenuFallbackMock);
       } catch {
-        if (!cancelled) setMenu(FALLBACK_MENU);
+        if (!cancelled) setMenu(merchantMenuFallbackMock);
       } finally {
         if (!cancelled) setMenuLoading(false);
       }

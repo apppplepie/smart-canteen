@@ -6,6 +6,7 @@ import { cn } from "../lib/utils";
 import { createOrder } from "../api/orders";
 import { createOrderItem } from "../api/orderItems";
 import { getBaseUrl } from "../api/client";
+import { checkoutAddressesMock } from "../mocks/checkoutAddresses";
 
 interface CheckoutPageProps {
   merchant: { id: number; name: string };
@@ -20,13 +21,9 @@ export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu, userId 
   const [orderType, setOrderType] = useState<"dine-in" | "delivery">("dine-in");
   const [isPaying, setIsPaying] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
-  const [selectedAddress, setSelectedAddress] = useState("南区 3栋 402室");
+  const [selectedAddress, setSelectedAddress] = useState(checkoutAddressesMock[0] ?? "");
 
-  const addresses = [
-    "南区 3栋 402室",
-    "北区 1栋 101室",
-    "东区 5栋 205室",
-  ];
+  const addresses = checkoutAddressesMock;
 
   const cartItems = Object.entries(cart)
     .filter(([_, count]) => count > 0)
