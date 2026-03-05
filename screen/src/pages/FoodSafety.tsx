@@ -69,25 +69,30 @@ const TrustGauge = () => {
             </linearGradient>
           </defs>
           {/* Background Arc */}
-          <path
-            d="M 20 100 A 80 80 0 0 1 180 100"
-            fill="none"
-            stroke="rgba(255,255,255,0.05)"
-            strokeWidth="16"
-            strokeLinecap="round"
-          />
-          {/* Value Arc */}
-          <path
-            d="M 20 100 A 80 80 0 0 1 180 100"
-            fill="none"
-            stroke="url(#gauge-grad)"
-            strokeWidth="16"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            filter="url(#neon-glow)"
-            className="transition-all duration-1500 ease-out"
-          />
+           
+  {/* 将两个 path 包裹在 <g> 中，向上平移 10px（可根据需要调整数值） */}
+  <g transform="translate(0, -20)">
+    {/* Background Arc */}
+    <path
+      d="M 20 100 A 80 80 0 0 1 180 100"
+      fill="none"
+      stroke="rgba(255,255,255,0.05)"
+      strokeWidth="16"
+      strokeLinecap="round"
+    />
+    {/* Value Arc */}
+    <path
+      d="M 20 100 A 80 80 0 0 1 180 100"
+      fill="none"
+      stroke="url(#gauge-grad)"
+      strokeWidth="16"
+      strokeLinecap="round"
+      strokeDasharray={circumference}
+      strokeDashoffset={strokeDashoffset}
+      filter="url(#neon-glow)"
+      className="transition-all duration-1500 ease-out"
+    />
+  </g>
         </svg>
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center w-full">
           <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]">
