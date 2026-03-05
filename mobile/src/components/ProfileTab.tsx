@@ -39,7 +39,7 @@ const data = [
   { time: "13:00", wait: 10, queue: 20 },
 ];
 
-export type ProfileUser = { name: string; id: string; avatar: string; userId?: number } | null;
+export type ProfileUser = { name: string; id: string; avatar: string; userId?: number; token?: string } | null;
 
 export interface ProfileTabProps {
   user?: ProfileUser;

@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bot, X, Send, Sparkles, Loader2 } from 'lucide-react';
+import { Bot, X, Send, Sparkles, Loader2, Plus } from 'lucide-react';
 
 import { getApiBaseUrl } from '../../api/client';
 import { aiAssistantMenuContext, aiAssistantInitialMessage } from '../../mocks/aiAssistant';
+
+const SCREEN_CLIENT_ID = 'screen';
 
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,6 +24,16 @@ export function AIAssistant() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const screenHeaders = (): HeadersInit => ({
+    'Content-Type': 'application/json',
+    'X-Client-Id': SCREEN_CLIENT_ID,
+  });
+
+  const startNewChat = () => {
+    setConversationId(null);
+    setMessages([aiAssistantInitialMessage]);
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -66,7 +78,7 @@ ${aiAssistantMenuContext}
     try {
       const res = await fetch(`${baseUrl}/api/ai/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: screenHeaders(),
         body: JSON.stringify(body),
       });
 
@@ -113,6 +125,13 @@ ${aiAssistantMenuContext}
             {/* Header */}
             <div className="h-16 bg-gradient-to-r from-cyan-500/20 to-blue-600/20 border-b border-white/10 flex items-center justify-between px-4 shrink-0">
               <div className="flex items-center gap-3">
+                <button
+                  onClick={startNewChat}
+                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                  title="新对话"
+                >
+                  <Plus size={16} />
+                </button>
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] keep-colors">
                   <Bot size={20} />
                 </div>

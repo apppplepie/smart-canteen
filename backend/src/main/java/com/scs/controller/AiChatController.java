@@ -346,12 +346,13 @@ public class AiChatController {
     }
 
     /**
-     * GET /api/ai/conversations?userId= 会话列表，按 updated_at 倒序。
-     * userId 优先取 query，未传时从请求头 X-User-Id 解析；都没有则返回空（未登录不展示历史）
+     * GET /api/ai/conversations?userId= &amp; clientId= 会话列表，按 updated_at 倒序。
+     * userId 优先取 query，未传时从请求头 X-User-Id 解析；都没有则可用 clientId（如 screen）取无用户会话列表。
      */
     @GetMapping(value = "/conversations", produces = MediaType.APPLICATION_JSON_VALUE)
     public ApiResult<List<Map<String, Object>>> listConversations(
             @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String clientId,
             HttpServletRequest request) {
         if (userId == null && request != null) {
             String header = request.getHeader("X-User-Id");
@@ -367,9 +368,15 @@ public class AiChatController {
                     .flatMap(su -> userRepo.findByUsername(su.username()).map(u -> u.getId()))
                     .orElse(null);
         }
+        if (clientId == null && request != null) {
+            String h = request.getHeader("X-Client-Id");
+            if (h != null && !h.isBlank()) clientId = h.trim();
+        }
         List<AiConversation> list;
         if (userId != null) {
             list = conversationRepo.findByUser_IdOrderByUpdatedAtDesc(userId);
+        } else if (clientId != null && !clientId.isBlank()) {
+            list = conversationRepo.findByUser_IdIsNullOrderByUpdatedAtDesc();
         } else {
             list = List.of();
         }

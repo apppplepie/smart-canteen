@@ -56,7 +56,7 @@ function formatConversationTime(iso: string): string {
   return weekdays[d.getDay()] + " " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
-export type AIAssistantUser = { userId?: number } | null;
+export type AIAssistantUser = { userId?: number; token?: string } | null;
 
 export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MSG]);
@@ -68,10 +68,9 @@ export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const authHeaders = (): HeadersInit => {
-    const h: HeadersInit = { "Content-Type": "application/json" };
-    if (user?.userId != null) {
-      (h as Record<string, string>)["X-User-Id"] = String(user.userId);
-    }
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (user?.userId != null) h["X-User-Id"] = String(user.userId);
+    if (user?.token != null && user.token !== "") h["Authorization"] = `Bearer ${user.token}`;
     return h;
   };
 
