@@ -43,6 +43,15 @@ export interface MenuItemDto {
   updatedAt?: string;
 }
 
+export interface MaterialDto {
+  id: number;
+  vendorId?: number;
+  name: string;
+  allergenTags?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface PostDto {
   id: number;
   userId?: number;
@@ -131,6 +140,8 @@ export interface RetainedSampleDto {
   id: number;
   sampleCode?: string;
   vendorId?: number;
+  /** 后端连库返回的供应商名称 */
+  vendorName?: string;
   collectedAt?: string;
   storageLocation?: string;
   status?: string;

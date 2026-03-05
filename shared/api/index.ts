@@ -17,6 +17,7 @@ export type {
   UserDto,
   VendorDto,
   MenuItemDto,
+  MaterialDto,
   PostDto,
   FoundItemDto,
   LostItemDto,

@@ -182,7 +182,7 @@ const ReportCards = ({ reports }: { reports: Array<{ id: number; type: string; r
                     {report.icon}
                   </div>
                   <div className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-black rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                    {report.result}
+                    {report.result === 'PASS' ? '合格' : report.result === 'FAIL' ? '不合格' : report.result}
                   </div>
                 </div>
                 <div className="relative z-10 mb-4">
@@ -357,25 +357,36 @@ export default function FoodSafety() {
               
               <div className="animate-scroll-y flex flex-col gap-3 pt-2">
                 {[...samples, ...samples].map((sample, idx) => (
-                  <div key={idx} className="bg-black/20 border border-white/5 rounded-2xl p-4 hover:bg-white/5 transition-colors cursor-pointer group">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono text-slate-300">{sample.id}</span>
-                        <span className="text-sm font-bold text-white">{sample.meal}</span>
-                      </div>
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
-                        sample.status.includes('冷藏') ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 
-                        sample.status.includes('销毁') ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' : 
-                        'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                  <div key={`${sample.id}-${idx}`} className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer group">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-mono text-sm font-bold text-cyan-300 tracking-wide">{sample.id}</span>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                        sample.status.includes('冷藏') || sample.status === '在库' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                        sample.status === '已处置' || sample.status.includes('销毁') ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' :
+                        sample.status === '检测中' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' :
+                        sample.status === '待入库' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                        'bg-slate-500/20 text-slate-400 border-slate-500/30'
                       }`}>
                         {sample.status}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-slate-400">
-                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {sample.time}</span>
-                      <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {sample.loc}</span>
-                      <span className="flex items-center gap-1 ml-auto"><Users className="w-3.5 h-3.5" /> {sample.operator}</span>
-                    </div>
+                    <dl className="space-y-2 text-xs">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="text-slate-500 w-16 shrink-0">采集时间</span>
+                        <span>{sample.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="text-slate-500 w-16 shrink-0">存放位置</span>
+                        <span>{sample.loc}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Store className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="text-slate-500 w-16 shrink-0">供应商</span>
+                        <span>{sample.vendor}</span>
+                      </div>
+                    </dl>
                   </div>
                 ))}
               </div>

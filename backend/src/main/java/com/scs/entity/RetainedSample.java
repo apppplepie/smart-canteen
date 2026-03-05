@@ -1,6 +1,7 @@
 package com.scs.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -56,4 +57,8 @@ public class RetainedSample {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Long getVendorId() { return vendorId != null ? vendorId : (vendor != null ? vendor.getId() : null); }
     public void setVendorId(Long vendorId) { this.vendorId = vendorId; }
+
+    /** 序列化时连库带出供应商名称，供前端直接展示 */
+    @JsonProperty("vendorName")
+    public String getVendorName() { return vendor != null ? vendor.getName() : null; }
 }

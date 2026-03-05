@@ -34,10 +34,10 @@ export const foodSafetyReports = [
 ];
 
 export const foodSafetySamples = [
-  { id: 'S-20260226-01', meal: '早餐', time: '07:30', loc: 'A区冷藏柜', status: '冷藏中 (48h)', operator: '张师傅' },
-  { id: 'S-20260226-02', meal: '午餐', time: '11:30', loc: 'B区冷藏柜', status: '冷藏中 (48h)', operator: '李阿姨' },
-  { id: 'S-20260226-03', meal: '晚餐', time: '17:30', loc: 'A区冷藏柜', status: '待入库', operator: '王师傅' },
-  { id: 'S-20260224-01', meal: '前日早餐', time: '07:30', loc: 'C区冷藏柜', status: '已销毁', operator: '赵主管' },
+  { id: 'S-20260226-01', meal: '早餐', time: '07:30', loc: 'A区冷藏柜', status: '冷藏中 (48h)', operator: '张师傅', vendor: '一食堂1号窗', category: '主食' },
+  { id: 'S-20260226-02', meal: '午餐', time: '11:30', loc: 'B区冷藏柜', status: '冷藏中 (48h)', operator: '李阿姨', vendor: '一食堂2号窗', category: '热菜' },
+  { id: 'S-20260226-03', meal: '晚餐', time: '17:30', loc: 'A区冷藏柜', status: '待入库', operator: '王师傅', vendor: '二食堂3号窗', category: '凉菜' },
+  { id: 'S-20260224-01', meal: '前日早餐', time: '07:30', loc: 'C区冷藏柜', status: '已销毁', operator: '赵主管', vendor: '一食堂1号窗', category: '汤品' },
 ];
 
 const defaultTagStyle = { icon: Info, color: 'text-slate-400 bg-slate-500/20 border-slate-500/30' };

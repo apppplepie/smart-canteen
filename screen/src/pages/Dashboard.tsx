@@ -6,6 +6,7 @@ import {
   CheckCircle2, ArrowRight, Map, ChefHat, Utensils
 } from 'lucide-react';
 import { useDashboard } from '../hooks/useBackendData';
+import { generateInitialWindows } from '../mocks/dashboard';
 
 // --- Components ---
 
@@ -94,7 +95,7 @@ const WindowCard: React.FC<{ window: any; isServing: boolean; statusConfig: Stat
 };
 
 const HeatmapGuide = ({ windows }: { windows: any[] }) => {
-  // Find best window (idle, lowest queue)
+  // 推荐：等待人数最少的窗口。后端真实逻辑为每 1min 统计各窗口等待人数并返回 20 个值，前端取最小值推荐
   const bestWindow = [...windows].sort((a, b) => a.queue - b.queue)[0];
 
   const getHeatmapColor = (queue: number) => {
@@ -169,32 +170,50 @@ const HeatmapGuide = ({ windows }: { windows: any[] }) => {
 };
 
 const CallingArea = ({
+  justServed,
+  waiting,
+  isFromApi,
+  isDemoMode,
   initialJustServed,
   initialWaiting,
 }: {
+  justServed: { id: string; win: string }[];
+  waiting: string[];
+  isFromApi: boolean;
+  isDemoMode: boolean;
   initialJustServed: { id: string; win: string }[];
   initialWaiting: string[];
 }) => {
-  const [justServed, setJustServed] = useState<{ id: string; win: string }[]>(initialJustServed);
-  const [waiting, setWaiting] = useState<string[]>(initialWaiting);
+  const [mockJustServed, setMockJustServed] = useState<{ id: string; win: string }[]>(initialJustServed);
+  const [mockWaiting, setMockWaiting] = useState<string[]>(initialWaiting);
+  const useMockCallingData = !isFromApi || isDemoMode;
 
   useEffect(() => {
+    if (!useMockCallingData) return;
     const timer = setInterval(() => {
       const newId = (Math.random() > 0.5 ? 'A' : 'B') + Math.floor(100 + Math.random() * 900);
       const newWin = 'W0' + Math.floor(1 + Math.random() * 8);
-      
-      setJustServed(prev => {
-        const next = [{ id: newId, win: newWin }, ...prev].slice(0, 4);
-        return next;
-      });
-      
-      setWaiting(prev => {
-        const next = [newId, ...prev].slice(0, 15);
-        return next;
-      });
+      setMockJustServed(prev => [{ id: newId, win: newWin }, ...prev].slice(0, 4));
+      setMockWaiting(prev => [newId, ...prev].slice(0, 15));
     }, 3500);
     return () => clearInterval(timer);
-  }, []);
+  }, [useMockCallingData]);
+
+  const displayJustServed = useMockCallingData ? mockJustServed : justServed;
+  const displayWaiting = useMockCallingData ? mockWaiting : waiting;
+
+  // 请取餐列表动画变体
+  const justServedVariants = {
+    initial: { opacity: 0, x: 50, scale: 0.8 },
+    animate: { opacity: 1, x: 0, scale: 1 },
+    exit: { opacity: 0, x: -50, scale: 0.8, transition: { duration: 0.2 } },
+  };
+  // 待取餐标签动画变体
+  const waitingVariants = {
+    initial: { opacity: 0, scale: 0.6 },
+    animate: { opacity: 1, scale: 1 },
+    exit: { opacity: 0, scale: 0.6, transition: { duration: 0.15 } },
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -206,21 +225,24 @@ const CallingArea = ({
       </div>
 
       <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
-        {/* Just Served (Sliding in) */}
-        <div className="bg-black/20 rounded-2xl border border-white/5 p-4 overflow-hidden flex flex-col">
+        {/* Just Served（滑动队列） */}
+        <div className="bg-black/20 rounded-2xl border border-white/5 p-4 overflow-hidden flex flex-col relative">
           <h3 className="text-sm font-bold text-emerald-400 mb-3 flex items-center gap-2 shrink-0">
             <CheckCircle2 className="w-4 h-4" /> 请取餐
           </h3>
-          <div className="flex-1 relative min-h-0 overflow-hidden">
-            <AnimatePresence>
-              {justServed.map((item, idx) => (
+          <div className="flex-1 relative min-h-0 pr-1 -mr-1 overflow-y-auto scrollbar-hide">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {displayJustServed.map((item) => (
                 <motion.div
-                  key={item.id + idx}
-                  initial={{ opacity: 0, x: -50, scale: 0.9 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                  className="mb-3 last:mb-0 bg-gradient-to-r from-emerald-500/20 to-transparent border-l-4 border-emerald-500 p-3 rounded-r-xl shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                  key={item.id}
+                  layout
+                  variants={justServedVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  whileHover={{ scale: 1.02, x: 5, transition: { duration: 0.1 } }}
+                  className="mb-3 last:mb-0 bg-gradient-to-r from-emerald-500/20 to-transparent border-l-4 border-emerald-500 p-3 rounded-r-xl shadow-[0_0_15px_rgba(16,185,129,0.1)] cursor-pointer"
                 >
                   <div className="flex justify-between items-center">
                     <span className="text-2xl font-black text-white tracking-wider">{item.id}</span>
@@ -232,24 +254,32 @@ const CallingArea = ({
               ))}
             </AnimatePresence>
           </div>
+          {displayJustServed.length > 3 && (
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+          )}
         </div>
 
-        {/* Waiting for Pickup (Stacking) */}
-        <div className="bg-black/20 rounded-2xl border border-white/5 p-4 flex flex-col">
+        {/* 待取餐（标签堆叠） */}
+        <div className="bg-black/20 rounded-2xl border border-white/5 p-4 flex flex-col relative">
           <h3 className="text-sm font-bold text-slate-400 mb-3 flex items-center gap-2 shrink-0">
             <Clock className="w-4 h-4" /> 待取餐
           </h3>
           <div className="flex-1 overflow-hidden relative min-h-0">
-            <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-slate-900/80 to-transparent z-10" />
-            <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-slate-900/80 to-transparent z-10" />
-            <div className="flex flex-wrap gap-2 content-start h-full overflow-y-auto custom-scrollbar pr-1 pt-2">
-              <AnimatePresence>
-                {waiting.map((id, idx) => (
+            <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-slate-900/80 to-transparent z-10 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-slate-900/80 to-transparent z-10 pointer-events-none" />
+            <div className="flex flex-wrap gap-2 content-start h-full overflow-y-auto scrollbar-hide pr-1 pt-2 pb-1">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {displayWaiting.map((id) => (
                   <motion.div
-                    key={id + idx}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-slate-300 font-mono font-bold text-sm"
+                    key={id}
+                    layout
+                    variants={waitingVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                    whileHover={{ scale: 1.08, transition: { duration: 0.1 } }}
+                    className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-slate-300 font-mono font-bold text-sm cursor-default"
                   >
                     {id}
                   </motion.div>
@@ -264,36 +294,77 @@ const CallingArea = ({
 };
 
 export default function Dashboard() {
-  const { windows, setWindows, statusConfig, initialJustServed, initialWaiting, isFromApi } = useDashboard();
+  const { windows, setWindows, statusConfig, initialJustServed, initialWaiting, justServed, waiting, isFromApi } = useDashboard();
   const [servingWindowId, setServingWindowId] = useState<string | null>(null);
+  const [isDemoMode, setDemoMode] = useState(false);
+  const [demoWindows, setDemoWindows] = useState(() => generateInitialWindows());
+  const [heatmapDemoWindows, setHeatmapDemoWindows] = useState(() => generateInitialWindows());
 
-  // 仅在使用 mock 数据时模拟排队人数变化
+  // 进入演示模式时重置窗口与热力图数据
   useEffect(() => {
-    if (isFromApi) return;
+    if (isDemoMode) {
+      setDemoWindows(generateInitialWindows());
+      setHeatmapDemoWindows(generateInitialWindows());
+    }
+  }, [isDemoMode]);
+
+  // 演示模式：热力图 20 个窗口的等待数据每 5s 刷新一次，推荐等待人数最少的窗口
+  useEffect(() => {
+    if (!isDemoMode) return;
+    const timer = setInterval(() => {
+      setHeatmapDemoWindows(generateInitialWindows());
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [isDemoMode]);
+
+  // 仅在使用 mock 数据且非演示时，用 API 的 windows 做模拟变化
+  useEffect(() => {
+    if (isFromApi && !isDemoMode) return;
+    if (isDemoMode) {
+      const timer = setInterval(() => {
+        setDemoWindows((prev) => {
+          const next = [...prev];
+          for (let i = 0; i < 4; i++) {
+            const idx = Math.floor(Math.random() * next.length);
+            const win = { ...next[idx] };
+            if (win.queue > 0 && Math.random() > 0.4) {
+              win.queue -= 1;
+              if (i === 0) {
+                setServingWindowId(win.id);
+                setTimeout(() => setServingWindowId(null), 1000);
+              }
+            } else {
+              win.queue += 1;
+            }
+            if (win.queue < 5) win.status = 'idle';
+            else if (win.queue < 15) win.status = 'busy';
+            else win.status = 'congested';
+            win.wait = `${Math.max(1, win.queue * 1.5).toFixed(0)}min`;
+            next[idx] = win;
+          }
+          return next;
+        });
+      }, 1500);
+      return () => clearInterval(timer);
+    }
     const timer = setInterval(() => {
       setWindows((prev) => {
         const next = [...prev];
-        // Pick multiple random windows to update to make the heatmap look alive
         for (let i = 0; i < 4; i++) {
           const idx = Math.floor(Math.random() * next.length);
           const win = { ...next[idx] };
-          
-          // Randomly decrease queue (serving) or increase
           if (win.queue > 0 && Math.random() > 0.4) {
             win.queue -= 1;
             if (i === 0) {
               setServingWindowId(win.id);
-              setTimeout(() => setServingWindowId(null), 1000); // Reset animation state
+              setTimeout(() => setServingWindowId(null), 1000);
             }
           } else {
             win.queue += 1;
           }
-          
-          // Update status based on queue
           if (win.queue < 5) win.status = 'idle';
           else if (win.queue < 15) win.status = 'busy';
           else win.status = 'congested';
-          
           win.wait = `${Math.max(1, win.queue * 1.5).toFixed(0)}min`;
           next[idx] = win;
         }
@@ -301,7 +372,9 @@ export default function Dashboard() {
       });
     }, 1500);
     return () => clearInterval(timer);
-  }, [isFromApi, setWindows]);
+  }, [isFromApi, isDemoMode, setWindows]);
+
+  const displayWindows = isDemoMode ? demoWindows : windows;
 
   return (
     <PageContainer>
@@ -315,6 +388,13 @@ export default function Dashboard() {
         }
         .animate-scroll-x:hover {
           animation-play-state: paused;
+        }
+        .scrollbar-hide {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
         }
       `}</style>
       
@@ -331,13 +411,21 @@ export default function Dashboard() {
               <Store className="text-blue-400 w-8 h-8" />
               窗口实时状态流
             </h1>
-            <div className="flex items-center gap-2 text-sm text-slate-400 bg-white/5 px-4 py-2 rounded-full border border-white/10">
+            <button
+              type="button"
+              onClick={() => setDemoMode((v) => !v)}
+              className={`flex items-center gap-2 text-sm px-4 py-2 rounded-full border transition-colors cursor-pointer ${
+                isDemoMode
+                  ? 'text-amber-300 bg-amber-500/20 border-amber-500/40 hover:bg-amber-500/30'
+                  : 'text-slate-400 bg-white/5 border-white/10 hover:bg-white/10'
+              }`}
+            >
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isDemoMode ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${isDemoMode ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
               </span>
-              系统实时同步中
-            </div>
+              {isDemoMode ? '演示模式' : '系统实时同步中'}
+            </button>
           </div>
           
           <div className="flex-1 relative overflow-hidden rounded-3xl bg-black/20 border border-white/5">
@@ -348,7 +436,7 @@ export default function Dashboard() {
             <div className="absolute inset-y-0 flex items-center">
               <div className="animate-scroll-x flex gap-6 px-6">
                 {/* Double the array for seamless infinite scroll */}
-                {[...windows, ...windows].map((window, idx) => (
+                {[...displayWindows, ...displayWindows].map((window, idx) => (
                   <WindowCard 
                     key={`${window.id}-${idx}`} 
                     window={window} 
@@ -370,7 +458,7 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             className="lg:col-span-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 flex flex-col overflow-hidden"
           >
-            <HeatmapGuide windows={windows} />
+            <HeatmapGuide windows={isDemoMode ? heatmapDemoWindows : displayWindows} />
           </motion.div>
 
           {/* 3) Scrolling Calling Area */}
@@ -380,7 +468,14 @@ export default function Dashboard() {
             transition={{ delay: 0.1 }}
             className="lg:col-span-3 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 flex flex-col overflow-hidden"
           >
-            <CallingArea initialJustServed={initialJustServed} initialWaiting={initialWaiting} />
+            <CallingArea
+              justServed={justServed}
+              waiting={waiting}
+              isFromApi={isFromApi}
+              isDemoMode={isDemoMode}
+              initialJustServed={initialJustServed}
+              initialWaiting={initialWaiting}
+            />
           </motion.div>
 
         </div>

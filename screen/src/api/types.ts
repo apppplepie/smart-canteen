@@ -2,6 +2,7 @@
 export type {
   VendorDto,
   MenuItemDto,
+  MaterialDto,
   QueueEntryDto,
   TestReportDto,
   RetainedSampleDto,

@@ -2,7 +2,7 @@
  * 将后端 DTO 转成前端页面使用的结构
  */
 import type { Dish } from '../components/menu/DishCardModal';
-import type { VendorDto, MenuItemDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto, FoundItemDto, LostItemDto } from '@scs/api';
+import type { VendorDto, MenuItemDto, MaterialDto, QueueEntryDto, TestReportDto, RetainedSampleDto, SensorLogDto, PostDto, FoundItemDto, LostItemDto } from '@scs/api';
 import { getApiBaseUrl } from '@scs/api';
 
 const defaultImage = (id: number) => `https://picsum.photos/seed/dish${id}/600/800`;
@@ -59,6 +59,8 @@ export function buildDashboardWindow(
   if (queueCount > 15) status = 'congested';
   else if (queueCount > 5) status = 'busy';
   const wait = `${Math.max(1, Math.round(queueCount * 1.5))}min`;
+  const rawImage = vendor.imageUrl?.trim();
+  const image = rawImage ? resolveImageUrl(rawImage) : `https://picsum.photos/seed/win${vendor.id}/400/300`;
   return {
     id: `W${String(vendor.id).padStart(2, '0')}`,
     name: vendor.name ?? `${vendor.id}号窗`,
@@ -66,8 +68,31 @@ export function buildDashboardWindow(
     queue: queueCount,
     wait,
     dish: firstDishName ?? '今日套餐',
-    image: `https://picsum.photos/seed/win${vendor.id}/400/300`,
+    image,
   };
+}
+
+/** queue_entries -> 叫号大厅：请取餐（已叫号）+ 待取餐（排队中） */
+export function queueEntriesToCalling(entries: QueueEntryDto[]): {
+  justServed: { id: string; win: string }[];
+  waiting: string[];
+} {
+  const withCalled = entries.filter((e) => e.calledAt != null);
+  const justServed = [...withCalled]
+    .sort((a, b) => (new Date((b.calledAt as string) || 0).getTime()) - (new Date((a.calledAt as string) || 0).getTime()))
+    .slice(0, 4)
+    .map((e) => ({
+      id: e.queueNumber ?? '',
+      win: `W${String(e.vendorId ?? 0).padStart(2, '0')}`,
+    }))
+    .filter((x) => x.id);
+  const waitingEntries = entries.filter((e) => (e.status ?? 'waiting') === 'waiting');
+  const waiting = [...waitingEntries]
+    .sort((a, b) => (new Date((a.createdAt as string) || 0).getTime()) - (new Date((b.createdAt as string) || 0).getTime()))
+    .slice(0, 15)
+    .map((e) => e.queueNumber ?? '')
+    .filter(Boolean);
+  return { justServed, waiting };
 }
 
 /** TestReport -> 食安公示卡片（需配合前端 icon，这里只返回数据） */
@@ -88,7 +113,45 @@ export function testReportToDisplay(r: TestReportDto): {
   };
 }
 
-/** RetainedSample -> 留样追踪行 */
+/** Material（食材）-> 留样追踪行展示，供食安页接数据库用 */
+export function materialToSampleDisplay(m: MaterialDto, vendorName?: string): {
+  id: string;
+  meal: string;
+  time: string;
+  loc: string;
+  status: string;
+  operator: string;
+  vendor: string;
+  category: string;
+} {
+  const time = m.createdAt ? formatDateTime(m.createdAt) : '--';
+  const vendor = (vendorName ?? '').trim() || (m.vendorId != null ? `#${m.vendorId}` : '--');
+  const category = (m.allergenTags ?? '').trim().split(/[,，]/)[0]?.trim() || '食材';
+  return {
+    id: `M-${m.id}`,
+    meal: m.name ?? '食材',
+    time,
+    loc: '--',
+    status: '在库',
+    operator: '--',
+    vendor,
+    category,
+  };
+}
+
+/** 后端 status 英文 -> 展示用中文 */
+function retainedStatusLabel(s: string | undefined): string {
+  if (!s || !s.trim()) return '在库';
+  const lower = s.trim().toLowerCase();
+  if (lower === 'available') return '在库';
+  if (lower === 'discarded' || lower === 'disposed' || lower.includes('销毁') || lower.includes('处置')) return '已处置';
+  if (lower === 'testing' || lower.includes('检测')) return '检测中';
+  if (lower.includes('冷藏')) return s.trim();
+  if (lower.includes('待') || lower === 'pending') return '待入库';
+  return s.trim();
+}
+
+/** RetainedSample -> 留样追踪行（适配 retained_samples 表：sample_code, vendor_id, collected_at, storage_location, status） */
 export function retainedSampleToDisplay(r: RetainedSampleDto): {
   id: string;
   meal: string;
@@ -96,15 +159,20 @@ export function retainedSampleToDisplay(r: RetainedSampleDto): {
   loc: string;
   status: string;
   operator: string;
+  vendor: string;
+  category: string;
 } {
-  const collected = r.collectedAt ? formatTime(r.collectedAt) : '--';
+  const collected = r.collectedAt ? formatDateTime(r.collectedAt) : '--';
+  const vendorLabel = (r.vendorName ?? '').trim() || (r.vendorId != null ? `#${r.vendorId}` : '--');
   return {
     id: r.sampleCode ?? `S-${r.id}`,
     meal: '留样',
     time: collected,
     loc: r.storageLocation ?? '--',
-    status: r.status ?? '冷藏中 (48h)',
+    status: retainedStatusLabel(r.status),
     operator: '--',
+    vendor: vendorLabel,
+    category: '--',
   };
 }
 
