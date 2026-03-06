@@ -13,10 +13,23 @@ import { MerchantPage } from "./MerchantPage";
 import { THEME } from "../config/theme";
 import { cn } from "../lib/utils";
 import { SharedPostDetail } from "./SharedPostDetail";
-import { listPosts, listVendors } from "../api";
+import { listPosts, listVendors, createVendorReview } from "../api";
+import { listOrdersByUser } from "../api/orders";
+import { listOrderItemsByOrder } from "../api/orderItems";
+import { getMenuItem } from "../api/menuItems";
+import { getBaseUrl } from "../api/client";
 import { postToSharedPost } from "../api/mapPost";
 import type { SharedPost } from "./SharedPostDetail";
 import { dynamicsPostsFallbackMock, type DynamicsPost } from "../mocks/dynamicsPosts";
+
+/** 从历史订单解析出的最近一单菜品，用于快速发布卡片 */
+type HistoryDishItem = {
+  vendorName: string;
+  dishName?: string;
+  image: string;
+  vendorId?: number;
+  totalAmount?: number;
+};
 
 export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
   const [isPublishing, setIsPublishing] = useState(false);
@@ -26,8 +39,11 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
   const [posts, setPosts] = useState<SharedPost[]>(dynamicsPostsFallbackMock);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
+  const [submittingRating, setSubmittingRating] = useState(false);
+  const [historyDish, setHistoryDish] = useState<HistoryDishItem | null>(null);
 
   const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+  const apiBase = getBaseUrl();
 
   const fetchPosts = React.useCallback(async () => {
     if (!baseUrl) return;
@@ -57,6 +73,56 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
     })();
     return () => { cancelled = true; };
   }, [baseUrl, fetchPosts]);
+
+  const fetchHistoryDish = React.useCallback(async () => {
+    if (!apiBase || user?.userId == null) return;
+    try {
+      const orders = await listOrdersByUser(user.userId);
+      const completed = orders.filter((o) => {
+        const s = (o.status ?? "").toLowerCase();
+        return s === "completed" || s === "已完成" || s === "done";
+      });
+      const last = completed[0];
+      if (!last) return;
+      const vendors = await listVendors();
+      const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
+      const vendorName = vendorMap.get(last.vendorId ?? 0) ?? "订单";
+      const orderItems = await listOrderItemsByOrder(last.id);
+      const firstItem = orderItems[0];
+      if (!firstItem?.menuItemId) {
+        setHistoryDish({
+          vendorName,
+          image: `https://picsum.photos/seed/v${last.vendorId ?? last.id}/100/100`,
+          vendorId: last.vendorId,
+          totalAmount: last.totalAmount,
+        });
+        return;
+      }
+      const menuItem = await getMenuItem(firstItem.menuItemId);
+      const img =
+        menuItem?.imageUrl?.startsWith("http")
+          ? menuItem.imageUrl
+          : menuItem?.imageUrl
+            ? `${apiBase.replace(/\/$/, "")}${menuItem.imageUrl.startsWith("/") ? "" : "/"}${menuItem.imageUrl}`
+            : `https://picsum.photos/seed/m${firstItem.menuItemId}/100/100`;
+      setHistoryDish({
+        vendorName,
+        dishName: menuItem?.name,
+        image: img,
+        vendorId: last.vendorId,
+        totalAmount: last.totalAmount,
+      });
+    } catch {
+      setHistoryDish(null);
+    }
+  }, [apiBase, user?.userId]);
+
+  useEffect(() => {
+    if (!apiBase || user?.userId == null) return;
+    let cancelled = false;
+    fetchHistoryDish();
+    return () => { cancelled = true; };
+  }, [apiBase, user?.userId, fetchHistoryDish]);
 
   const filteredPosts = useMemo(() => {
     const list = posts as DynamicsPost[];
@@ -146,13 +212,24 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
             <SharedPostDetail
               post={selectedPost}
               onMerchantClick={(id) => setSelectedMerchantId(id)}
+              currentUserId={user?.userId}
             />
           </motion.div>
         ) : isPublishing ? (
           <PublishPage
             onBack={() => setIsPublishing(false)}
-            onSuccess={() => fetchPosts()}
+            onSuccess={() => { fetchPosts(); fetchHistoryDish(); }}
             currentUserId={user?.userId}
+            initialOrder={
+              historyDish
+                ? {
+                    name: historyDish.vendorName,
+                    items: historyDish.dishName ?? (historyDish.totalAmount != null ? `¥${historyDish.totalAmount}` : ""),
+                    image: historyDish.image,
+                    vendorId: historyDish.vendorId,
+                  }
+                : undefined
+            }
             key="publish-page"
           />
         ) : null}
@@ -198,44 +275,72 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
       </div>
 
       <div className="max-w-7xl mx-auto w-full px-6 -mt-12 md:-mt-16 relative z-10 space-y-6 md:space-y-8">
-        {/* Quick Publish Card */}
+        {/* Quick Publish Card - 来自历史订单的最近一单 */}
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <img src="https://picsum.photos/seed/m2/100/100" className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-sm">健康轻食沙拉</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">招牌鸡胸肉沙拉</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          size={20}
-                          onClick={() => setRating(star)}
-                          className={cn(
-                            "cursor-pointer transition-colors",
-                            rating >= star ? "text-amber-400 fill-amber-400" : "text-gray-200"
-                          )}
-                        />
-                      ))}
-                    </div>
-                    <button 
-                      disabled={rating === 0}
-                      className="px-4 py-1.5 bg-[#FF6B6B] text-white text-xs font-bold rounded-full shadow-sm disabled:opacity-50 transition-colors"
-                    >
-                      发布评分
-                    </button>
-                  </div>
-                </div>
-                <div 
-                  onClick={() => setIsPublishing(true)}
-                  className="bg-gray-50 rounded-2xl px-4 py-3 text-sm text-gray-400 cursor-text hover:bg-gray-100 transition-colors flex items-center gap-2"
-                >
-                  写下你的长评，分享美食体验...
-                </div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <img
+                src={historyDish?.image ?? "https://picsum.photos/seed/m2/100/100"}
+                className="w-12 h-12 rounded-xl object-cover"
+                referrerPolicy="no-referrer"
+                alt=""
+              />
+              <div>
+                <h3 className="font-bold text-gray-900 text-sm">
+                  {historyDish?.vendorName ?? "—"}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {historyDish?.dishName ?? (historyDish ? `¥${historyDish.totalAmount ?? ""}` : "从历史订单选择要点评的菜品")}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    size={20}
+                    onClick={() => setRating(star)}
+                    className={cn(
+                      "cursor-pointer transition-colors",
+                      rating >= star ? "text-amber-400 fill-amber-400" : "text-gray-200"
+                    )}
+                  />
+                ))}
+              </div>
+              <button
+                disabled={rating === 0 || !historyDish?.vendorId || user?.userId == null || submittingRating}
+                onClick={async () => {
+                  if (rating < 1 || !historyDish?.vendorId || user?.userId == null) return;
+                  const base = getBaseUrl();
+                  if (!base) { alert("未配置后端地址"); return; }
+                  setSubmittingRating(true);
+                  try {
+                    await createVendorReview({
+                      userId: user.userId!,
+                      vendorId: historyDish.vendorId,
+                      rating,
+                    });
+                    fetchHistoryDish();
+                  } catch (e) {
+                    alert("发布评分失败: " + (e instanceof Error ? e.message : String(e)));
+                  } finally {
+                    setSubmittingRating(false);
+                  }
+                }}
+                className="px-4 py-1.5 bg-[#FF6B6B] text-white text-xs font-bold rounded-full shadow-sm disabled:opacity-50 transition-colors flex items-center gap-1"
+              >
+                {submittingRating ? <Loader2 size={14} className="animate-spin" /> : null}
+                发布评分
+              </button>
+            </div>
+          </div>
+          <div
+            onClick={() => setIsPublishing(true)}
+            className="bg-gray-50 rounded-2xl px-4 py-3 text-sm text-gray-400 cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+          >
+            写下你的长评，分享美食体验...
+          </div>
         </div>
 
         {/* Waterfall Layout */}

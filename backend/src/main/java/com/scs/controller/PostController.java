@@ -1,6 +1,8 @@
 package com.scs.controller;
 
 import com.scs.entity.Post;
+import com.scs.entity.PostLike;
+import com.scs.repository.PostLikeRepository;
 import com.scs.repository.PostRepository;
 import com.scs.repository.UserRepository;
 import com.scs.repository.VendorRepository;
@@ -9,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -17,11 +20,14 @@ public class PostController {
     private final PostRepository repo;
     private final UserRepository userRepo;
     private final VendorRepository vendorRepo;
+    private final PostLikeRepository likeRepo;
 
-    public PostController(PostRepository repo, UserRepository userRepo, VendorRepository vendorRepo) {
+    public PostController(PostRepository repo, UserRepository userRepo, VendorRepository vendorRepo,
+                         PostLikeRepository likeRepo) {
         this.repo = repo;
         this.userRepo = userRepo;
         this.vendorRepo = vendorRepo;
+        this.likeRepo = likeRepo;
     }
 
     @GetMapping
@@ -46,9 +52,53 @@ public class PostController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Post> get(@PathVariable Long id) {
+    public ResponseEntity<Post> get(@PathVariable Long id,
+                                    @RequestParam(required = false) Long userId) {
         return repo.findById(id)
-                .map(ResponseEntity::ok)
+                .map(post -> {
+                    if (userId != null && likeRepo.existsByPost_IdAndUser_Id(post.getId(), userId)) {
+                        post.setLikedByCurrentUser(true);
+                    }
+                    return ResponseEntity.ok(post);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/like")
+    public ResponseEntity<Post> like(@PathVariable Long id, @RequestBody Map<String, Long> body) {
+        Long userId = body != null ? body.get("userId") : null;
+        if (userId == null) return ResponseEntity.badRequest().build();
+        return repo.findById(id)
+                .map(post -> {
+                    if (likeRepo.existsByPost_IdAndUser_Id(id, userId)) {
+                        return ResponseEntity.ok(post);
+                    }
+                    PostLike like = new PostLike();
+                    like.setPostId(id);
+                    like.setUserId(userId);
+                    repo.findById(id).ifPresent(like::setPost);
+                    userRepo.findById(userId).ifPresent(like::setUser);
+                    likeRepo.save(like);
+                    post.setLikeCount((post.getLikeCount() != null ? post.getLikeCount() : 0) + 1);
+                    repo.save(post);
+                    return ResponseEntity.ok(post);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}/like")
+    public ResponseEntity<Post> unlike(@PathVariable Long id, @RequestParam Long userId) {
+        if (userId == null) return ResponseEntity.badRequest().build();
+        return repo.findById(id)
+                .map(post -> {
+                    likeRepo.findByPost_IdAndUser_Id(id, userId).ifPresent(likeRepo::delete);
+                    int count = (post.getLikeCount() != null ? post.getLikeCount() : 0);
+                    if (count > 0) {
+                        post.setLikeCount(count - 1);
+                        repo.save(post);
+                    }
+                    return ResponseEntity.ok(post);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 

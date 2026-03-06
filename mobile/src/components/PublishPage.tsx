@@ -3,7 +3,7 @@ import { X, Image as ImageIcon, MapPin, Hash, Smile, Star, ChevronRight, Loader2
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { HistoryOrdersPage } from "./HistoryOrdersPage";
-import { createPost } from "../api";
+import { createPost, createVendorReview } from "../api";
 import { getBaseUrl } from "../api/client";
 import { publishPageDefaultOrderMock } from "../mocks/publishPage";
 
@@ -11,34 +11,57 @@ export function PublishPage({
   onBack,
   onSuccess,
   currentUserId,
+  initialOrder,
 }: {
   onBack: () => void;
   onSuccess?: () => void;
   currentUserId?: number;
+  /** 从食堂圈快速发布卡片传入的历史订单，用于预填选单 */
+  initialOrder?: { name: string; items: string; image: string; vendorId?: number };
   key?: string;
 }) {
   const [content, setContent] = useState("");
   const [rating, setRating] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<{ name: string; items: string; image: string; orderId?: number; vendorId?: number }>({ ...publishPageDefaultOrderMock });
+  const [selectedOrder, setSelectedOrder] = useState<{ name: string; items: string; image: string; orderId?: number; vendorId?: number }>(() => ({
+    ...publishPageDefaultOrderMock,
+    ...(initialOrder ? { name: initialOrder.name, items: initialOrder.items, image: initialOrder.image, vendorId: initialOrder.vendorId } : {}),
+  }));
+
+  const canPublish = !!(
+    content.trim() ||
+    (selectedOrder.vendorId != null && rating >= 1)
+  );
 
   const handlePublish = async () => {
-    if (!content.trim()) return;
+    if (!canPublish) return;
     const base = getBaseUrl();
     if (!base) {
       alert("未配置后端地址，无法发布");
       return;
     }
+    const uid = currentUserId ?? 1;
     setSubmitting(true);
     try {
-      await createPost({
-        userId: currentUserId ?? 1,
-        vendorId: selectedOrder.vendorId,
-        content: content.trim(),
-        mediaUrls: undefined,
-        postType: "dynamics",
-      });
+      if (selectedOrder.vendorId != null) {
+        await createVendorReview({
+          userId: uid,
+          vendorId: selectedOrder.vendorId,
+          orderId: selectedOrder.orderId,
+          rating: rating >= 1 ? rating : 5,
+          content: content.trim() || undefined,
+        });
+      } else {
+        if (!content.trim()) return;
+        await createPost({
+          userId: uid,
+          vendorId: selectedOrder.vendorId,
+          content: content.trim(),
+          mediaUrls: undefined,
+          postType: "dynamics",
+        });
+      }
       onSuccess?.();
       onBack();
     } catch (e) {
@@ -88,7 +111,7 @@ export function PublishPage({
           </button>
           <span className="font-bold text-gray-900">发布动态</span>
           <button
-            disabled={!content.trim() || submitting}
+            disabled={!canPublish || submitting}
             onClick={handlePublish}
             className="bg-[#FF6B6B] text-white px-5 py-2 rounded-full font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#FF8E8E] transition-colors shadow-sm shadow-red-500/20 flex items-center gap-2"
           >

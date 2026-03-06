@@ -32,8 +32,10 @@ export type {
 } from "./types";
 
 export * from "./vendors";
+export * from "./vendorReviews";
 export * from "./menuItems";
 export * from "./posts";
+export * from "./postComments";
 export * from "./orders";
 export * from "./lostItems";
 export * from "./foundItems";

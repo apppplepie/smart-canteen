@@ -1,7 +1,11 @@
-import React from "react";
-import { ChevronLeft, Share2, MapPin, Heart, MessageCircle } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { ChevronLeft, Share2, MapPin, Heart, MessageCircle, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
+import { getBaseUrl } from "../api/client";
+import { getPost, likePost, unlikePost } from "../api/posts";
+import { listPostComments, createPostComment, type PostCommentDto } from "../api/postComments";
+import { formatRelativeTime } from "../lib/utils";
 
 export interface SharedPost {
   id: string | number;
@@ -16,32 +20,107 @@ export interface SharedPost {
   merchantName?: string;
   dishName?: string;
   tags?: string[];
-  // For feedback
   type?: string;
   status?: string;
   reply?: string;
-  // For lost/found
   location?: string;
   isFound?: boolean;
   isReturned?: boolean;
+  likedByCurrentUser?: boolean;
 }
 
 interface SharedPostDetailProps {
   post: SharedPost;
   onMerchantClick?: (id: number) => void;
+  currentUserId?: number;
   children?: React.ReactNode;
 }
 
-export function SharedPostDetail({ post, onMerchantClick, children }: SharedPostDetailProps) {
+export function SharedPostDetail({ post, onMerchantClick, currentUserId, children }: SharedPostDetailProps) {
   const timeDisplay = post.time || post.postTime;
   const userDisplay = post.user || { name: "匿名用户", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=anon" };
+  const postId = Number(post.id);
+  const hasApi = !!getBaseUrl();
+
+  const [comments, setComments] = useState<PostCommentDto[]>([]);
+  const [loadingComments, setLoadingComments] = useState(hasApi && !Number.isNaN(postId));
+  const [commentText, setCommentText] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [liked, setLiked] = useState(!!post.likedByCurrentUser);
+  const [likeCount, setLikeCount] = useState(post.likes ?? 0);
+  const [commentCount, setCommentCount] = useState(post.comments ?? 0);
+  const [togglingLike, setTogglingLike] = useState(false);
+
+  const loadComments = useCallback(async () => {
+    if (!hasApi || Number.isNaN(postId)) return;
+    setLoadingComments(true);
+    try {
+      const list = await listPostComments(postId);
+      setComments(list);
+    } catch {
+      setComments([]);
+    } finally {
+      setLoadingComments(false);
+    }
+  }, [hasApi, postId]);
+
+  useEffect(() => {
+    loadComments();
+  }, [loadComments]);
+
+  useEffect(() => {
+    if (hasApi && !Number.isNaN(postId) && currentUserId != null) {
+      getPost(postId, currentUserId).then((p) => {
+        if (p) {
+          setLiked(!!p.likedByCurrentUser);
+          if (p.likeCount != null) setLikeCount(p.likeCount);
+          if (p.commentCount != null) setCommentCount(p.commentCount);
+        }
+      }).catch(() => {});
+    }
+  }, [hasApi, postId, currentUserId]);
+
+  const handleLike = async () => {
+    if (!hasApi || currentUserId == null || Number.isNaN(postId) || togglingLike) return;
+    setTogglingLike(true);
+    try {
+      if (liked) {
+        const p = await unlikePost(postId, currentUserId);
+        setLiked(false);
+        if (p.likeCount != null) setLikeCount(p.likeCount);
+      } else {
+        const p = await likePost(postId, currentUserId);
+        setLiked(true);
+        if (p.likeCount != null) setLikeCount(p.likeCount);
+      }
+    } catch {
+      // keep state
+    } finally {
+      setTogglingLike(false);
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    const text = commentText.trim();
+    if (!text || currentUserId == null || !hasApi || Number.isNaN(postId) || submittingComment) return;
+    setSubmittingComment(true);
+    try {
+      await createPostComment({ postId, userId: currentUserId, content: text });
+      setCommentText("");
+      setCommentCount((c) => c + 1);
+      await loadComments();
+    } catch (e) {
+      alert("评论失败: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
 
   return (
     <div className="flex-1 overflow-y-auto pb-24 bg-white relative z-20">
-      {/* User Info Header (No back button, just user info) */}
       <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b border-gray-100 sticky top-0 bg-white z-10">
         <div className="flex items-center gap-2">
-          <img src={userDisplay.avatar} className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
+          <img src={userDisplay.avatar} className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" alt="" />
           <span className="font-medium text-gray-900">{userDisplay.name}</span>
         </div>
         <button className="p-2 text-gray-600 hover:bg-gray-50 rounded-full">
@@ -50,12 +129,12 @@ export function SharedPostDetail({ post, onMerchantClick, children }: SharedPost
       </div>
 
       {post.image && (
-        <img src={post.image} className="w-full h-auto max-h-[60vh] object-cover" referrerPolicy="no-referrer" />
+        <img src={post.image} className="w-full h-auto max-h-[60vh] object-cover" referrerPolicy="no-referrer" alt="" />
       )}
-      
+
       <div className="p-6">
         {post.merchantName && (
-          <button 
+          <button
             onClick={() => onMerchantClick?.(post.merchantId!)}
             className="flex items-center gap-2 text-sm text-[#FF6B6B] bg-red-50 px-3 py-2 rounded-xl mb-4 hover:bg-red-100 transition-colors"
           >
@@ -66,29 +145,78 @@ export function SharedPostDetail({ post, onMerchantClick, children }: SharedPost
             <ChevronLeft size={16} className="rotate-180 ml-auto" />
           </button>
         )}
-        
+
         {post.tags && (
           <div className="flex gap-2 mb-4">
             {post.tags.map((tag: string) => (
-              <span key={tag} className={cn("text-xs px-3 py-1 rounded-lg font-bold", tag === "寻物启事" ? "bg-orange-50 text-orange-500" : tag === "失物招领" ? "bg-blue-50 text-blue-500" : tag === "问题反馈" ? "bg-red-50 text-[#FF6B6B]" : "bg-gray-50 text-gray-500")}>
+              <span
+                key={tag}
+                className={cn(
+                  "text-xs px-3 py-1 rounded-lg font-bold",
+                  tag === "寻物启事" ? "bg-orange-50 text-orange-500" : tag === "失物招领" ? "bg-blue-50 text-blue-500" : tag === "问题反馈" ? "bg-red-50 text-[#FF6B6B]" : "bg-gray-50 text-gray-500"
+                )}
+              >
                 {tag}
               </span>
             ))}
           </div>
         )}
-        
+
         <p className="text-gray-800 text-lg leading-relaxed mb-4">{post.content}</p>
-        
+
         {children}
-        
+
         <div className="text-sm text-gray-400 mb-6 mt-4">{timeDisplay}</div>
-        
+
         <div className="border-t border-gray-100 pt-6">
-          <h3 className="font-bold text-gray-900 mb-4">共 {post.comments || 0} 条评论</h3>
-          <div className="flex gap-3 mb-6">
-            <img src="https://picsum.photos/seed/user/100/100" className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
-            <div className="flex-1 bg-gray-50 rounded-2xl px-4 py-2 text-sm text-gray-500">
-              说点什么...
+          <h3 className="font-bold text-gray-900 mb-4">共 {commentCount} 条评论</h3>
+          {loadingComments ? (
+            <div className="flex justify-center py-4">
+              <Loader2 size={20} className="animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <ul className="space-y-4 mb-4">
+              {comments.map((c) => (
+                <li key={c.id} className="flex gap-3">
+                  <img
+                    src={c.userImageUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + (c.userId ?? "u")}
+                    className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+                    referrerPolicy="no-referrer"
+                    alt=""
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-gray-900">{c.userDisplayName ?? "用户"}</span>
+                    <span className="text-xs text-gray-400 ml-2">{c.createdAt ? formatRelativeTime(c.createdAt) : ""}</span>
+                    <p className="text-sm text-gray-800 mt-0.5 break-words">{c.content}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-3">
+            <img
+              src={currentUserId ? "https://api.dicebear.com/7.x/avataaars/svg?seed=" + currentUserId : "https://api.dicebear.com/7.x/avataaars/svg?seed=anon"}
+              className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+              referrerPolicy="no-referrer"
+              alt=""
+            />
+            <div className="flex-1 flex gap-2">
+              <input
+                type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="说点什么..."
+                className="flex-1 bg-gray-50 rounded-2xl px-4 py-2 text-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-[#FF6B6B]/30"
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmitComment()}
+              />
+              <button
+                disabled={!commentText.trim() || submittingComment}
+                onClick={handleSubmitComment}
+                className="px-4 py-2 bg-[#FF6B6B] text-white text-sm font-medium rounded-2xl disabled:opacity-50 flex items-center gap-1"
+              >
+                {submittingComment ? <Loader2 size={16} className="animate-spin" /> : null}
+                发送
+              </button>
             </div>
           </div>
         </div>
@@ -99,13 +227,17 @@ export function SharedPostDetail({ post, onMerchantClick, children }: SharedPost
           说点什么...
         </div>
         <div className="flex items-center gap-6 text-gray-600">
-          <div className="flex items-center gap-1">
-            <Heart size={24} />
-            <span className="text-sm">{post.likes || 0}</span>
-          </div>
+          <button
+            onClick={handleLike}
+            disabled={!hasApi || currentUserId == null || togglingLike}
+            className={cn("flex items-center gap-1 transition-colors", liked ? "text-red-500" : "hover:text-red-400")}
+          >
+            {togglingLike ? <Loader2 size={24} className="animate-spin" /> : <Heart size={24} className={liked ? "fill-current" : ""} />}
+            <span className="text-sm">{likeCount}</span>
+          </button>
           <div className="flex items-center gap-1">
             <MessageCircle size={24} />
-            <span className="text-sm">{post.comments || 0}</span>
+            <span className="text-sm">{commentCount}</span>
           </div>
         </div>
       </div>

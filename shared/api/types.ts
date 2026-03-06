@@ -24,6 +24,8 @@ export interface VendorDto {
   createdAt?: string;
   updatedAt?: string;
   isActive?: boolean;
+  /** 展示用：无评分时后端返回 4.5，有评分时为该商家所有评分的平均值 */
+  averageRating?: number;
 }
 
 export interface MenuItemDto {
@@ -66,6 +68,8 @@ export interface PostDto {
   mediaUrls?: string;
   likeCount?: number;
   commentCount?: number;
+  /** 当前用户是否已点赞（仅 get 单条时可能返回） */
+  likedByCurrentUser?: boolean;
   status?: string;
   replyContent?: string;
   /** AI建议（预留，可为空） */

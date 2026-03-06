@@ -15,11 +15,24 @@ export async function listPostsByVendor(vendorId: number): Promise<PostDto[]> {
   return apiGet<PostDto[]>(`/api/posts/vendor/${vendorId}`);
 }
 
-export async function getPost(id: number): Promise<PostDto | null> {
+export async function getPost(id: number, userId?: number): Promise<PostDto | null> {
   const base = (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) ?? "";
-  const url = (typeof base === "string" ? base.replace(/\/$/, "") : "") + `/api/posts/${id}`;
+  const q = userId != null ? `?userId=${userId}` : "";
+  const url = (typeof base === "string" ? base.replace(/\/$/, "") : "") + `/api/posts/${id}${q}`;
   const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
   if (res.status === 404) return null;
+  if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
+  return res.json();
+}
+
+export async function likePost(postId: number, userId: number): Promise<PostDto> {
+  return apiPost<PostDto>(`/api/posts/${postId}/like`, { userId });
+}
+
+export async function unlikePost(postId: number, userId: number): Promise<PostDto> {
+  const base = (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) ?? "";
+  const url = (typeof base === "string" ? base.replace(/\/$/, "") : "") + `/api/posts/${postId}/like?userId=${userId}`;
+  const res = await fetch(url, { method: "DELETE", headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
   return res.json();
 }

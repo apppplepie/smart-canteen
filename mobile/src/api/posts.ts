@@ -6,4 +6,6 @@ export {
   createPost,
   updatePost,
   deletePost,
+  likePost,
+  unlikePost,
 } from "@scs/api";

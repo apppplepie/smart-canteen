@@ -38,6 +38,10 @@ public class Vendor {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    /** 展示用：无评分时为 4.5，有评分时为该商家所有评分的平均值，由 Controller 注入 */
+    @Transient
+    private Double averageRating;
+
     @OneToMany(mappedBy = "vendor", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<MenuItem> menuItems = new ArrayList<>();
@@ -71,6 +75,8 @@ public class Vendor {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+    public Double getAverageRating() { return averageRating; }
+    public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
     public List<MenuItem> getMenuItems() { return menuItems; }
     public void setMenuItems(List<MenuItem> menuItems) { this.menuItems = menuItems; }
 }

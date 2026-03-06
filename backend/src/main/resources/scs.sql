@@ -410,4 +410,59 @@ CREATE TABLE `lost_items` (
   CONSTRAINT `lost_items_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '遗失登记' ROW_FORMAT = Dynamic;
 
+-- ----------------------------
+-- Table structure for vendor_reviews（商店评分：仅评分或评分+评论；有评论时同步到食堂圈）
+-- ----------------------------
+DROP TABLE IF EXISTS `vendor_reviews`;
+CREATE TABLE `vendor_reviews` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL COMMENT '用户',
+  `vendor_id` bigint NOT NULL COMMENT '商家',
+  `order_id` bigint DEFAULT NULL COMMENT '关联订单（可选）',
+  `rating` tinyint NOT NULL COMMENT '1-5 星',
+  `content` text COMMENT '评论内容，为空则仅评分不发布到食堂圈',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_vendor_reviews_user` (`user_id`),
+  KEY `idx_vendor_reviews_vendor` (`vendor_id`),
+  KEY `idx_vendor_reviews_created` (`created_at` DESC),
+  KEY `fk_vendor_reviews_order` (`order_id`),
+  CONSTRAINT `fk_vendor_reviews_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT,
+  CONSTRAINT `fk_vendor_reviews_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `fk_vendor_reviews_vendor` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商店评分：仅评分或评分+评论；有评论时同步到食堂圈';
+
+-- ----------------------------
+-- Table structure for post_comments（帖子评论）
+-- ----------------------------
+DROP TABLE IF EXISTS `post_comments`;
+CREATE TABLE `post_comments` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `post_id` bigint NOT NULL COMMENT '帖子',
+  `user_id` bigint NOT NULL COMMENT '评论用户',
+  `content` text NOT NULL COMMENT '评论内容',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_post_comments_post` (`post_id`),
+  KEY `idx_post_comments_created` (`created_at` DESC),
+  CONSTRAINT `fk_post_comments_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `fk_post_comments_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='帖子评论';
+
+-- ----------------------------
+-- Table structure for post_likes（帖子点赞，用于管理点赞数与防重复）
+-- ----------------------------
+DROP TABLE IF EXISTS `post_likes`;
+CREATE TABLE `post_likes` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `post_id` bigint NOT NULL,
+  `user_id` bigint NOT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_post_likes_post_user` (`post_id`, `user_id`),
+  KEY `idx_post_likes_post` (`post_id`),
+  CONSTRAINT `fk_post_likes_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `fk_post_likes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='帖子点赞';
+
 SET FOREIGN_KEY_CHECKS = 1;

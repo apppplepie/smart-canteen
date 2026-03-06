@@ -63,6 +63,9 @@ public class Post {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Transient
+    private Boolean likedByCurrentUser;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -102,4 +105,6 @@ public class Post {
     public void setUserId(Long userId) { this.userId = userId; }
     public Long getVendorId() { return vendorId != null ? vendorId : (vendor != null ? vendor.getId() : null); }
     public void setVendorId(Long vendorId) { this.vendorId = vendorId; }
+    public Boolean getLikedByCurrentUser() { return likedByCurrentUser; }
+    public void setLikedByCurrentUser(Boolean likedByCurrentUser) { this.likedByCurrentUser = likedByCurrentUser; }
 }
