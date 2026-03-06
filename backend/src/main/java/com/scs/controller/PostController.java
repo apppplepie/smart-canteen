@@ -25,12 +25,18 @@ public class PostController {
     }
 
     @GetMapping
-    public List<Post> list() {
+    public List<Post> list(@RequestParam(required = false) String postType) {
+        if (postType != null && !postType.isBlank()) {
+            return repo.findByPostTypeOrderByCreatedAtDesc(postType.trim());
+        }
         return repo.findAll();
     }
 
     @GetMapping("/user/{userId}")
-    public List<Post> listByUser(@PathVariable Long userId) {
+    public List<Post> listByUser(@PathVariable Long userId, @RequestParam(required = false) String postType) {
+        if (postType != null && !postType.isBlank()) {
+            return repo.findByUser_IdAndPostTypeOrderByCreatedAtDesc(userId, postType.trim());
+        }
         return repo.findByUser_IdOrderByCreatedAtDesc(userId);
     }
 
@@ -49,6 +55,10 @@ public class PostController {
     @PostMapping
     public ResponseEntity<Post> create(@RequestBody Post entity) {
         if (entity.getId() != null) entity.setId(null);
+        if (entity.getPostType() == null || entity.getPostType().isBlank()) {
+            String ft = entity.getFeedbackType();
+            entity.setPostType((ft != null && !ft.isBlank()) ? "feedback" : "dynamics");
+        }
         resolveRelations(entity);
         Post saved = repo.save(entity);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);

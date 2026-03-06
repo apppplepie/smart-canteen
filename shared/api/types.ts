@@ -59,6 +59,8 @@ export interface PostDto {
   title?: string;
   /** food=菜品建议, service=服务态度, env=环境卫生, other=其他 */
   feedbackType?: string;
+  /** feedback=反馈, dynamics=食堂圈动态 */
+  postType?: string;
   content?: string;
   imageUrl?: string;
   mediaUrls?: string;

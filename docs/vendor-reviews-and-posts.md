@@ -55,21 +55,25 @@ CREATE TABLE `vendor_reviews` (
 
 ---
 
-## 四、食堂圈与 `posts` 的区分方式（二选一）
+## 四、食堂圈与 `posts` 的区分方式（已采用方案 A）
 
-要避免「反馈」和「食堂圈动态」混在一起，有两种做法。
+已采用 **方案 A**：在现有 `posts` 表加 `post_type`。
 
-### 方案 A：在现有 `posts` 表加 `post_type`（推荐，改表少）
-
-- 在 `posts` 增加字段：`post_type` varchar(32) DEFAULT 'feedback'，取值：
+- 在 `posts` 已增加字段：`post_type` varchar(32) DEFAULT 'feedback'，取值：
   - `feedback`：反馈（FeedbackPage 创建，有 feedback_type / 官方回复等）。
-  - `dynamics`：食堂圈动态（来自「带评论的商店评分」或以后其他动态）。
-- **反馈**：创建时 `post_type = 'feedback'`，列表/详情只查 `post_type = 'feedback'`。
-- **食堂圈**：DynamicsTab 只查 `post_type = 'dynamics'`；创建「带评论的评分」时，由后端写一条 `post_type = 'dynamics'` 的 post。
+  - `dynamics`：食堂圈动态（PublishPage 发布或以后「带评论的商店评分」同步）。
+- **反馈**：创建时 `post_type = 'feedback'`（后端根据 feedbackType 推断），历史只查 `postType=feedback`。
+- **食堂圈**：DynamicsTab 只请求 `GET /api/posts?postType=dynamics`；PublishPage 发布时传 `postType: 'dynamics'`。
 
-这样不需要再建一张“动态表”，只区分类型即可。
+**已有数据库迁移**（若表已存在，只需加列）：
 
-### 方案 B：食堂圈单独表 `dynamics_posts`
+```sql
+ALTER TABLE `posts` ADD COLUMN `post_type` varchar(32) NULL DEFAULT 'feedback' COMMENT 'feedback=反馈, dynamics=食堂圈动态' AFTER `feedback_type`;
+UPDATE `posts` SET `post_type` = 'dynamics' WHERE `feedback_type` IS NULL OR `feedback_type` = '' OR (`feedback_type` = 'other' AND `reply_content` IS NULL AND `ai_suggestion` IS NULL);
+-- 上面 UPDATE 可按实际数据调整：若希望历史“其他”算反馈则不要改为 dynamics
+```
+
+### 方案 B：食堂圈单独表 `dynamics_posts`（未采用）
 
 - 新建表 `dynamics_posts`（字段可和当前 post 类似：user_id, vendor_id, content, image_url, like_count, comment_count, created_at 等）。
 - 有评论的评分：写 `vendor_reviews` + 写一条 `dynamics_posts`。

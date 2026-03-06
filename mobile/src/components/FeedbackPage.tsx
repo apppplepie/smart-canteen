@@ -50,8 +50,8 @@ export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: 
       return;
     }
     try {
-      const list = await listPostsByUser(userId);
-      const feedbackPosts = list.filter((p) => p.feedbackType);
+      const list = await listPostsByUser(userId, { postType: "feedback" });
+      const feedbackPosts = list;
       const rows: FeedbackRow[] = feedbackPosts.map((p) => ({
         id: p.id,
         type: FEEDBACK_TYPE_LABELS[p.feedbackType!] ?? p.feedbackType ?? "其他建议",

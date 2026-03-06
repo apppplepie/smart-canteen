@@ -37,6 +37,7 @@ export function PublishPage({
         vendorId: selectedOrder.vendorId,
         content: content.trim(),
         mediaUrls: undefined,
+        postType: "dynamics",
       });
       onSuccess?.();
       onBack();

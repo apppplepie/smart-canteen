@@ -298,7 +298,7 @@ export function useFeedback(): {
     if (!isApiConfigured()) return Promise.resolve();
     setLoading(true);
     setError(null);
-    return apiGet<PostDto[]>('/api/posts')
+    return apiGet<PostDto[]>('/api/posts?postType=feedback')
       .then((posts) => {
         if (posts.length > 0) {
           setFeedbacks(posts.map((p, i) => postToFeedbackItem(p, i)));

@@ -33,6 +33,9 @@ public class Post {
     @Column(name = "feedback_type", length = 32)
     private String feedbackType = "other";
 
+    @Column(name = "post_type", length = 32)
+    private String postType = "feedback";
+
     @Column(columnDefinition = "TEXT")
     private String content;
 
@@ -75,6 +78,8 @@ public class Post {
     public void setTitle(String title) { this.title = title; }
     public String getFeedbackType() { return feedbackType; }
     public void setFeedbackType(String feedbackType) { this.feedbackType = feedbackType; }
+    public String getPostType() { return postType; }
+    public void setPostType(String postType) { this.postType = postType; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public String getImageUrl() { return imageUrl; }

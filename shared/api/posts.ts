@@ -1,12 +1,14 @@
 import { apiGet, apiPost, apiPut, apiDelete } from "./client";
 import type { PostDto } from "./types";
 
-export async function listPosts(): Promise<PostDto[]> {
-  return apiGet<PostDto[]>("/api/posts");
+export async function listPosts(params?: { postType?: string }): Promise<PostDto[]> {
+  const q = params?.postType ? `?postType=${encodeURIComponent(params.postType)}` : "";
+  return apiGet<PostDto[]>(`/api/posts${q}`);
 }
 
-export async function listPostsByUser(userId: number): Promise<PostDto[]> {
-  return apiGet<PostDto[]>(`/api/posts/user/${userId}`);
+export async function listPostsByUser(userId: number, params?: { postType?: string }): Promise<PostDto[]> {
+  const q = params?.postType ? `?postType=${encodeURIComponent(params.postType)}` : "";
+  return apiGet<PostDto[]>(`/api/posts/user/${userId}${q}`);
 }
 
 export async function listPostsByVendor(vendorId: number): Promise<PostDto[]> {

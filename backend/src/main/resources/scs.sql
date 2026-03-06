@@ -195,6 +195,7 @@ CREATE TABLE `posts`  (
   `vendor_id` bigint NULL DEFAULT NULL,
   `title` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `feedback_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'other' COMMENT 'food=菜品建议, service=服务态度, env=环境卫生, other=其他',
+  `post_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'feedback' COMMENT 'feedback=反馈, dynamics=食堂圈动态',
   `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
   `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '图片URL',
   `media_urls` json NULL,
