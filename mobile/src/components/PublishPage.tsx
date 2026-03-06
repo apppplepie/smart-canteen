@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { HistoryOrdersPage } from "./HistoryOrdersPage";
 import { createPost } from "../api";
-import { listOrdersByUser } from "../api/orders";
 import { getBaseUrl } from "../api/client";
 import { publishPageDefaultOrderMock } from "../mocks/publishPage";
 
@@ -48,42 +47,25 @@ export function PublishPage({
     }
   };
 
-  const loadHistoryForSelect = async () => {
-    if (!getBaseUrl() || !currentUserId) return;
-    try {
-      const orders = await listOrdersByUser(currentUserId);
-      if (orders.length > 0) {
-        const o = orders[0];
-        setSelectedOrder({
-          name: "订单#" + o.id,
-          items: "¥" + o.totalAmount,
-          image: "https://picsum.photos/seed/m2/100/100",
-          orderId: o.id,
-          vendorId: o.vendorId,
-        });
-      }
-    } catch {
-      // ignore
-    }
-  };
-
   return (
     <>
       <AnimatePresence>
         {showHistory && (
-          <HistoryOrdersPage
-            onBack={() => setShowHistory(false)}
-            userId={currentUserId}
-            onSelectOrder={(order) => {
-              setSelectedOrder({
-                name: order.vendorName ?? "订单",
-                items: "¥" + order.totalAmount,
-                image: order.image ?? "https://picsum.photos/seed/m2/100/100",
-                vendorId: order.vendorId,
-              });
-              setShowHistory(false);
-            }}
-          />
+          <div className="fixed inset-0 z-[110]">
+            <HistoryOrdersPage
+              onBack={() => setShowHistory(false)}
+              userId={currentUserId}
+              onSelectOrder={(order) => {
+                setSelectedOrder({
+                  name: order.vendorName ?? "订单",
+                  items: "¥" + order.totalAmount,
+                  image: order.image ?? "https://picsum.photos/seed/m2/100/100",
+                  vendorId: order.vendorId,
+                });
+                setShowHistory(false);
+              }}
+            />
+          </div>
         )}
       </AnimatePresence>
 
@@ -120,30 +102,28 @@ export function PublishPage({
         
         {/* Order Selection & Rating */}
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-6">
-          <div
-            onClick={() => {
-              loadHistoryForSelect();
-              setShowHistory(true);
-            }}
-            className="flex items-center justify-between mb-4 pb-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 rounded-xl p-2 -mx-2 transition-colors"
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            className="w-full flex items-center justify-between mb-4 pb-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 rounded-xl p-2 -mx-2 transition-colors text-left"
           >
             <div className="flex items-center gap-3">
-              <img src={selectedOrder.image} className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
+              <img src={selectedOrder.image} className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" alt="" />
               <div>
                 <h3 className="font-bold text-gray-900 text-sm">{selectedOrder.name}</h3>
                 <p className="text-xs text-gray-500 mt-0.5">{selectedOrder.items}</p>
               </div>
             </div>
             <div className="flex items-center gap-1 text-gray-400">
-              <span className="text-xs">切换评价餐品</span>
+              <span className="text-xs">打开历史订单选择</span>
               <ChevronRight size={16} />
             </div>
-          </div>
+          </button>
           
           <div className="flex flex-col items-center gap-3 py-2">
-            <span className="text-sm font-bold text-gray-900">
+            {/* <span className="text-sm font-bold text-gray-900">
               {rating === 0 ? "点击星星评分" : `${rating} 星好评`}
-            </span>
+            </span> */}
             <div className="flex items-center gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star

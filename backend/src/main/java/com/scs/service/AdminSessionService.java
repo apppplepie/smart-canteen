@@ -25,5 +25,6 @@ public class AdminSessionService {
         sessionMap.remove(token);
     }
 
-    public record SessionUser(String username, String role) {}
+    /** userId 用于 mobile（student/teacher），admin 登录也会写入便于 /users/me 统一返回 */
+    public record SessionUser(String username, String role, Long userId) {}
 }

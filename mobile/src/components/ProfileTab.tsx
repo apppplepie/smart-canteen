@@ -14,6 +14,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { listOrdersByUser } from "../api/orders";
+import type { OrderDto } from "@scs/api";
 import { listVendors } from "../api/vendors";
 import { formatRelativeTime } from "../lib/utils";
 import { getBaseUrl } from "../api/client";
@@ -51,15 +52,48 @@ export function ProfileTab({
   const [showHistory, setShowHistory] = useState(false);
   const [showMyPosts, setShowMyPosts] = useState(false);
   const [recentOrders, setRecentOrders] = useState<{ name: string; time: string; price: string; status: string; image: string }[]>([]);
+  /** 除「已完成」外的订单，用于「当前点餐状态」 */
+  const [activeOrders, setActiveOrders] = useState<{
+    id: number;
+    vendorId?: number;
+    vendorName: string;
+    status: string;
+    statusLabel: string;
+    queueNumber?: string;
+    totalAmount: number;
+    placedAt?: string;
+  }[]>([]);
 
-  // 0: 未点餐, 1: 制作中, 2: 请取餐
-  const [orderStatus, setOrderStatus] = useState(0);
+  const isOrderCompleted = (o: OrderDto) => {
+    const s = (o.status ?? "").toLowerCase();
+    return s === "completed" || s === "已完成" || s === "done";
+  };
+
+  const orderStatusLabel = (status: string): string => {
+    const s = (status ?? "").toLowerCase();
+    if (s === "pending" || s === "待接单") return "待接单";
+    if (s === "confirmed" || s === "已接单") return "已接单";
+    if (s === "preparing" || s === "cooking" || s === "制作中") return "制作中";
+    if (s === "ready" || s === "待取餐") return "请取餐";
+    return status || "进行中";
+  };
+
+  /** 未登录时 mock：0 未点餐 / 1 制作中 / 2 请取餐，轮播 */
+  const [mockOrderStatus, setMockOrderStatus] = useState(0);
+  useEffect(() => {
+    if (isLoggedIn) return;
+    const interval = setInterval(() => {
+      setMockOrderStatus((prev) => (prev + 1) % 3);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     const base = getBaseUrl();
     const uid = user?.userId;
     if (!base || uid == null) {
       setRecentOrders([]);
+      setActiveOrders([]);
       return;
     }
     let cancelled = false;
@@ -68,27 +102,37 @@ export function ProfileTab({
         const [list, vendors] = await Promise.all([listOrdersByUser(uid), listVendors()]);
         if (cancelled) return;
         const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
-        const rows = list.slice(0, 3).map((o) => ({
+        const completedList = list.filter((o) => isOrderCompleted(o));
+        const rows = completedList.slice(0, 3).map((o) => ({
           name: vendorMap.get(o.vendorId ?? 0) ?? "订单",
           time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
           price: String(o.totalAmount),
-          status: o.status ?? "已完成",
+          status: orderStatusLabel(o.status ?? "已完成"),
           image: `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
         }));
         setRecentOrders(rows);
+        const active = list
+          .filter((o) => !isOrderCompleted(o))
+          .map((o) => ({
+            id: o.id,
+            vendorId: o.vendorId,
+            vendorName: vendorMap.get(o.vendorId ?? 0) ?? "食堂",
+            status: o.status ?? "pending",
+            statusLabel: orderStatusLabel(o.status ?? ""),
+            queueNumber: o.queueNumber,
+            totalAmount: o.totalAmount,
+            placedAt: o.placedAt,
+          }));
+        setActiveOrders(active);
       } catch {
-        if (!cancelled) setRecentOrders([]);
+        if (!cancelled) {
+          setRecentOrders([]);
+          setActiveOrders([]);
+        }
       }
     })();
     return () => { cancelled = true; };
   }, [user?.userId]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setOrderStatus((prev) => (prev + 1) % 3);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleUserClick = () => {
     if (!isLoggedIn) {
@@ -182,117 +226,195 @@ export function ProfileTab({
 
       <div className="max-w-7xl mx-auto w-full px-6 mt-6 md:mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <div className="lg:col-span-2 space-y-6 md:space-y-8">
-          {/* Current Order Status */}
-          {isLoggedIn && (
-            <div>
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                当前点餐状态{" "}
-                {orderStatus !== 0 && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
-              </h3>
-              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
-                <AnimatePresence mode="wait">
-                  {orderStatus === 0 && (
-                    <motion.div
-                      key="status-0"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="flex flex-col items-center justify-center py-6 cursor-pointer"
+          {/* Current Order Status：已登录用接口数据，未登录用 mock 三态轮播 */}
+          <div>
+            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+              当前点餐状态{" "}
+              {(isLoggedIn ? activeOrders.length > 0 : mockOrderStatus !== 0) && (
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              )}
+            </h3>
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+              <AnimatePresence mode="wait">
+                {/* 已登录且无进行中订单 */}
+                {isLoggedIn && activeOrders.length === 0 && (
+                  <motion.div
+                    key="no-order"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex flex-col items-center justify-center py-6 cursor-pointer"
+                    onClick={() => onNavigate && onNavigate("ordering")}
+                  >
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                      <UtensilsCrossed className="text-gray-400" size={32} />
+                    </div>
+                    <h4 className="font-bold text-gray-900 mb-1">当前未点餐</h4>
+                    <p className="text-sm text-gray-500 mb-4">去看看今天有什么好吃的吧</p>
+                    <button className="bg-[#FF6B6B] text-white px-6 py-2 rounded-full text-sm font-bold shadow-sm hover:bg-[#FF8E8E] transition-colors">
+                      去点餐
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* 未登录 mock：状态 0 未点餐 */}
+                {!isLoggedIn && mockOrderStatus === 0 && (
+                  <motion.div
+                    key="mock-0"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex flex-col items-center justify-center py-6 cursor-pointer"
+                    onClick={() => onNavigate && onNavigate("ordering")}
+                  >
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                      <UtensilsCrossed className="text-gray-400" size={32} />
+                    </div>
+                    <h4 className="font-bold text-gray-900 mb-1">当前未点餐</h4>
+                    <p className="text-sm text-gray-500 mb-4">去看看今天有什么好吃的吧</p>
+                    <button className="bg-[#FF6B6B] text-white px-6 py-2 rounded-full text-sm font-bold shadow-sm hover:bg-[#FF8E8E] transition-colors">
+                      去点餐
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* 未登录 mock：状态 1 制作中 */}
+                {!isLoggedIn && mockOrderStatus === 1 && (
+                  <motion.div
+                    key="mock-1"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center">
+                          <Coffee className="text-orange-500" size={24} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900">川香麻辣烫</h4>
+                          <p className="text-xs text-gray-500 mt-1">
+                            取餐码: <span className="font-mono font-bold text-[#FF6B6B] text-lg">A102</span>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-gray-900">制作中</div>
+                        <div className="text-xs text-gray-400 mt-1">预计 5 分钟</div>
+                      </div>
+                    </div>
+                    <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden mb-6">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: "60%" }}
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-400 to-[#FF6B6B] rounded-full"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 未登录 mock：状态 2 请取餐 */}
+                {!isLoggedIn && mockOrderStatus === 2 && (
+                  <motion.div
+                    key="mock-2"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center">
+                          <ShoppingBag className="text-green-500" size={24} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900">川香麻辣烫</h4>
+                          <p className="text-xs text-gray-500 mt-1">
+                            请前往 <span className="font-bold text-gray-900">1楼东区 3号窗口</span> 取餐
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-green-500">请取餐</div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          取餐码: <span className="font-mono font-bold text-gray-900">A102</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden mb-6">
+                      <motion.div
+                        initial={{ width: "60%" }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="absolute top-0 left-0 h-full bg-green-500 rounded-full"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 已登录且有进行中订单 */}
+                {isLoggedIn && activeOrders.length > 0 && (
+                  <motion.div
+                    key="active-orders"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-4"
+                  >
+                    {activeOrders.map((order) => {
+                      const isReady = order.statusLabel === "请取餐";
+                      return (
+                        <div key={order.id} className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-100">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div
+                              className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                                isReady ? "bg-green-50" : "bg-orange-50"
+                              }`}
+                            >
+                              {isReady ? (
+                                <ShoppingBag className="text-green-500" size={24} />
+                              ) : (
+                                <Coffee className="text-orange-500" size={24} />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-gray-900 truncate">{order.vendorName}</h4>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {order.queueNumber ? (
+                                  <>
+                                    取餐码: <span className="font-mono font-bold text-[#FF6B6B]">{order.queueNumber}</span>
+                                  </>
+                                ) : (
+                                  order.placedAt ? formatRelativeTime(order.placedAt) : ""
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div
+                              className={`text-sm font-bold ${
+                                isReady ? "text-green-500" : "text-gray-900"
+                              }`}
+                            >
+                              {order.statusLabel}
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5">¥{order.totalAmount}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
                       onClick={() => onNavigate && onNavigate("ordering")}
+                      className="w-full py-2.5 rounded-xl border border-[#FF6B6B] text-[#FF6B6B] text-sm font-bold hover:bg-[#FF6B6B]/5 transition-colors"
                     >
-                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
-                        <UtensilsCrossed className="text-gray-400" size={32} />
-                      </div>
-                      <h4 className="font-bold text-gray-900 mb-1">当前未点餐</h4>
-                      <p className="text-sm text-gray-500 mb-4">去看看今天有什么好吃的吧</p>
-                      <button className="bg-[#FF6B6B] text-white px-6 py-2 rounded-full text-sm font-bold shadow-sm hover:bg-[#FF8E8E] transition-colors">
-                        去点餐
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {orderStatus === 1 && (
-                    <motion.div
-                      key="status-1"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center">
-                            <Coffee className="text-orange-500" size={24} />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-900">川香麻辣烫</h4>
-                            <p className="text-xs text-gray-500 mt-1">
-                              取餐码:{" "}
-                              <span className="font-mono font-bold text-[#FF6B6B] text-lg">
-                                A102
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-bold text-gray-900">制作中</div>
-                          <div className="text-xs text-gray-400 mt-1">预计 5 分钟</div>
-                        </div>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden mb-6">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: "60%" }}
-                          transition={{ duration: 1, ease: "easeOut" }}
-                          className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-400 to-[#FF6B6B] rounded-full"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {orderStatus === 2 && (
-                    <motion.div
-                      key="status-2"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center">
-                            <ShoppingBag className="text-green-500" size={24} />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-900">川香麻辣烫</h4>
-                            <p className="text-xs text-gray-500 mt-1">
-                              请前往 <span className="font-bold text-gray-900">1楼东区 3号窗口</span> 取餐
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-bold text-green-500">请取餐</div>
-                          <div className="text-xs text-gray-400 mt-1">
-                            取餐码: <span className="font-mono font-bold text-gray-900">A102</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden mb-6">
-                        <motion.div
-                          initial={{ width: "60%" }}
-                          animate={{ width: "100%" }}
-                          transition={{ duration: 0.5, ease: "easeOut" }}
-                          className="absolute top-0 left-0 h-full bg-green-500 rounded-full"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                      继续点餐
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          )}
+          </div>
 
           {/* Chart Area */}
           <div>
@@ -439,33 +561,40 @@ export function ProfileTab({
               </div>
 
               <div className="space-y-4">
-                {(recentOrders.length ? recentOrders : [
-                  { name: "健康轻食沙拉", time: "昨天 12:30", price: "28.00", status: "已完成", image: "https://picsum.photos/seed/m2/100/100" },
-                  { name: "日式咖喱屋", time: "周二 18:15", price: "32.50", status: "已完成", image: "https://picsum.photos/seed/m4/100/100" },
-                  { name: "川香麻辣烫", time: "周一 12:00", price: "18.50", status: "已完成", image: "https://picsum.photos/seed/m1/100/100" },
-                ]).map((order, i) => (
+                {recentOrders.length === 0 ? (
                   <div
-                    key={i}
-                    className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-gray-50 hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => setShowHistory(true)}
+                    className="bg-white rounded-2xl p-6 flex flex-col items-center justify-center gap-2 shadow-sm border border-gray-50 hover:shadow-md transition-shadow cursor-pointer text-gray-500"
                   >
-                    <img
-                      src={order.image}
-                      alt={order.name}
-                      className="w-16 h-16 rounded-xl object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-bold text-gray-900">{order.name}</h4>
-                        <span className="text-xs text-gray-500">{order.status}</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">{order.time}</p>
-                      <div className="font-bold text-gray-900 mt-2">
-                        ¥{order.price}
+                    <p className="text-sm">暂无已完成订单</p>
+                    <p className="text-xs">点击查看全部订单</p>
+                  </div>
+                ) : (
+                  recentOrders.map((order, i) => (
+                    <div
+                      key={order.name + order.time + i}
+                      onClick={() => setShowHistory(true)}
+                      className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-gray-50 hover:shadow-md transition-shadow cursor-pointer"
+                    >
+                      <img
+                        src={order.image}
+                        alt={order.name}
+                        className="w-16 h-16 rounded-xl object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-bold text-gray-900">{order.name}</h4>
+                          <span className="text-xs text-gray-500">{order.status}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">{order.time}</p>
+                        <div className="font-bold text-gray-900 mt-2">
+                          ¥{order.price}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}

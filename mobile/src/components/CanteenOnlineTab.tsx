@@ -128,7 +128,7 @@ export function CanteenOnlineTab({ user }: { user?: { userId?: number } | null }
                 <div>
                   <h3 className="font-bold text-gray-900 text-sm">智能推荐最优窗口</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {bestWindowIndex + 1}号窗口目前人最少，预计无需等待
+                    {bestWindowIndex + 1}号预计无需等待
                   </p>
                 </div>
               </div>

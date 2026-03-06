@@ -42,7 +42,7 @@ function getBase(): string {
  */
 export async function login(params: LoginParams): Promise<LoginResult> {
   const base = getBase();
-  const res = await fetch(`${base}/auth/login`, {
+  const res = await fetch(`${base}/api/v1/auth/mobile-login`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
@@ -71,7 +71,7 @@ export async function login(params: LoginParams): Promise<LoginResult> {
  */
 export async function getCurrentUser(token: string): Promise<CurrentUser> {
   const base = getBase();
-  const res = await fetch(`${base}/users/me`, {
+  const res = await fetch(`${base}/api/v1/users/me`, {
     method: "GET",
     headers: {
       Accept: "application/json",

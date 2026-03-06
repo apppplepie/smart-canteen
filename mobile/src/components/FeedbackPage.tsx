@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Clock, Loader2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { formatRelativeTime } from "../lib/utils";
@@ -28,6 +28,7 @@ export type FeedbackRow = {
   status: string;
   time: string;
   reply?: string;
+  aiSuggestion?: string;
 };
 
 export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: number }) {
@@ -58,6 +59,7 @@ export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: 
         status: p.status === "replied" ? "已解决" : "处理中",
         time: p.createdAt ? formatRelativeTime(p.createdAt) : "",
         reply: p.replyContent ?? undefined,
+        aiSuggestion: p.aiSuggestion ?? undefined,
       }));
       setHistory(rows.length ? rows : feedbackHistoryMock);
     } catch {
@@ -122,8 +124,9 @@ export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: 
       className="fixed inset-0 bg-gray-50 z-[100] flex flex-col"
     >
       <div className="bg-white px-4 pt-6 pb-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <button onClick={handleBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-full">
+        <button onClick={handleBack} className="flex items-center gap-1 p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-full min-w-[40px]">
           <ChevronLeft size={24} />
+          <span className="text-sm font-medium">返回</span>
         </button>
         {selectedPost ? (
           <span className="font-bold">反馈详情</span>
@@ -156,6 +159,17 @@ export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: 
               exit={{ opacity: 0, y: 20 }}
               className="fixed inset-0 bg-white z-20 flex flex-col"
             >
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPost(null)}
+                  className="p-2 -ml-1 text-gray-600 hover:bg-gray-50 rounded-full"
+                  aria-label="返回"
+                >
+                  <ChevronLeft size={22} />
+                </button>
+                <span className="font-bold text-gray-900 text-base">反馈详情</span>
+              </div>
               <SharedPostDetail post={{ ...selectedPost, tags: ["问题反馈", selectedPost.type] }}>
                 <div className="flex items-center justify-between mb-4 mt-4">
                   <div className="flex items-center gap-1 text-sm font-bold">
@@ -163,25 +177,33 @@ export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: 
                     <span className={selectedPost.status === "已解决" ? "text-emerald-500" : "text-amber-500"}>{selectedPost.status}</span>
                   </div>
                 </div>
-                <div className="border-t border-gray-100 pt-6 mt-6">
-                  <h3 className="font-bold text-gray-900 mb-4">处理进度</h3>
-                  <div className="relative pl-4 border-l-2 border-gray-100 space-y-6">
-                    <div className="relative">
-                      <div className="absolute -left-[21px] top-1 w-3 h-3 bg-gray-300 rounded-full border-2 border-white" />
-                      <p className="text-sm text-gray-500 mb-1">{selectedPost.time}</p>
-                      <p className="text-sm text-gray-900 font-medium">反馈已提交，等待处理</p>
-                    </div>
+                {/* 流程：有 AI建议 / 官方回复 才显示 */}
+                {(selectedPost.aiSuggestion || selectedPost.reply) && (
+                  <div className="border-t border-gray-100 pt-6 mt-6 space-y-4">
+                    {selectedPost.aiSuggestion && (
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 bg-violet-500/20 border-violet-400 text-violet-600 shadow-[0_0_12px_rgba(139,92,246,0.2)]">
+                          <Sparkles className="w-3 h-3" />
+                        </div>
+                        <div className="flex-1 rounded-xl border bg-violet-500/10 border-violet-500/30 pl-4 pr-4 py-3">
+                          <p className="text-xs font-bold mb-1.5 text-violet-600">AI建议</p>
+                          <p className="text-sm leading-relaxed text-gray-800">{selectedPost.aiSuggestion}</p>
+                        </div>
+                      </div>
+                    )}
                     {selectedPost.reply && (
-                      <div className="relative">
-                        <div className={cn("absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white", selectedPost.status === "已解决" ? "bg-emerald-500" : "bg-amber-500")} />
-                        <p className="text-sm text-gray-500 mb-1">食堂回复</p>
-                        <div className="bg-gray-50 rounded-2xl p-4 text-sm text-gray-700">
-                          {selectedPost.reply}
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 bg-emerald-500/20 border-emerald-400 text-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+                          <CheckCircle2 className="w-3 h-3" />
+                        </div>
+                        <div className="flex-1 rounded-xl border bg-emerald-500/10 border-emerald-500/30 pl-4 pr-4 py-3">
+                          <p className="text-xs font-bold mb-1.5 text-emerald-600">官方回复</p>
+                          <p className="text-sm leading-relaxed text-gray-800">{selectedPost.reply}</p>
                         </div>
                       </div>
                     )}
                   </div>
-                </div>
+                )}
               </SharedPostDetail>
             </motion.div>
           ) : activeTab === "发布" ? (

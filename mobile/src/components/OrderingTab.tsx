@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { MerchantPage } from "./MerchantPage";
 import { cn } from "../lib/utils";
 import { THEME } from "../config/theme";
-import { listVendors } from "../api/vendors";
+import { listVendors, listQueueEntries } from "@scs/api";
 import { getBaseUrl } from "../api/client";
 import { orderingMerchantsFallbackMock } from "../mocks/orderingMerchants";
 
@@ -18,12 +18,16 @@ type Merchant = {
   tags: string[];
   image: string;
   popular: boolean;
+  /** 当前排队人数（等待中），用于「最快」排序 */
+  queueCount: number;
 };
 
 export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [activeTab, setActiveTab] = useState<"推荐" | "最快">("推荐");
-  const [merchants, setMerchants] = useState<Merchant[]>(orderingMerchantsFallbackMock);
+  const [merchants, setMerchants] = useState<Merchant[]>(() =>
+    orderingMerchantsFallbackMock.map((m) => ({ ...m, queueCount: 0 }))
+  );
   const [loading, setLoading] = useState(!!getBaseUrl());
 
   useEffect(() => {
@@ -35,29 +39,47 @@ export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
     let cancelled = false;
     (async () => {
       try {
-        const list = await listVendors();
+        const [list, queueEntries] = await Promise.all([
+          listVendors(),
+          listQueueEntries().catch(() => []),
+        ]);
         if (cancelled) return;
-        const base = getBaseUrl();
+        const waitingByVendor = new Map<number, number>();
+        for (const e of queueEntries) {
+          if ((e.status ?? "waiting").toLowerCase() === "waiting" && e.vendorId != null) {
+            const v = e.vendorId;
+            waitingByVendor.set(v, (waitingByVendor.get(v) ?? 0) + 1);
+          }
+        }
+        const baseUrl = getBaseUrl();
         const mapped: Merchant[] = list.map((v) => {
           const image =
-            v.imageUrl && base
-              ? base.replace(/\/$/, "") + (v.imageUrl.startsWith("/") ? v.imageUrl : "/" + v.imageUrl)
+            v.imageUrl && baseUrl
+              ? baseUrl.replace(/\/$/, "") + (v.imageUrl.startsWith("/") ? v.imageUrl : "/" + v.imageUrl)
               : `https://picsum.photos/seed/m${v.id}/400/300`;
+          const queueCount = waitingByVendor.get(v.id) ?? 0;
+          const waitMin = Math.max(1, Math.round(queueCount * 1.5));
           return {
             id: v.id,
             name: v.name,
             rating: 4.5,
             reviews: 500,
-            time: "10-15 min",
+            time: queueCount <= 0 ? "即取" : `${waitMin}-${waitMin + 5} min`,
             distance: v.locationLabel ?? "食堂",
             tags: v.description ? [v.description.slice(0, 6)] : ["美食"],
             image,
             popular: v.id % 2 === 1,
+            queueCount,
           };
         });
-        setMerchants(mapped.length ? mapped : orderingMerchantsFallbackMock);
+        setMerchants(
+          mapped.length
+            ? mapped
+            : orderingMerchantsFallbackMock.map((m) => ({ ...m, queueCount: 0 }))
+        );
       } catch {
-        if (!cancelled) setMerchants(orderingMerchantsFallbackMock);
+        if (!cancelled)
+          setMerchants(orderingMerchantsFallbackMock.map((m) => ({ ...m, queueCount: 0 })));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -67,11 +89,7 @@ export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
 
   const sortedMerchants = useMemo(() => {
     if (activeTab === "最快") {
-      return [...merchants].sort((a, b) => {
-        const timeA = parseInt(a.time.split("-")[0], 10) || 10;
-        const timeB = parseInt(b.time.split("-")[0], 10) || 10;
-        return timeA - timeB;
-      });
+      return [...merchants].sort((a, b) => (a.queueCount ?? 0) - (b.queueCount ?? 0));
     }
     return merchants;
   }, [merchants, activeTab]);

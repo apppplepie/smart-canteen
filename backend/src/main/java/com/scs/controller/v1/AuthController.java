@@ -50,7 +50,7 @@ public class AuthController {
         Map<String, Object> row;
         try {
             row = jdbcTemplate.queryForMap(
-                    "select username, password, role, is_deleted from users where username = ? limit 1",
+                    "select id, username, password, role, is_deleted from users where username = ? limit 1",
                     username
             );
         } catch (Exception e) {
@@ -78,9 +78,60 @@ public class AuthController {
             return ApiResult.fail(403, "当前角色无后台访问权限");
         }
 
+        Long userId = row.get("id") != null ? ((Number) row.get("id")).longValue() : null;
         String token = "scs-admin-token-" + UUID.randomUUID();
-        adminSessionService.put(token, new AdminSessionService.SessionUser(username, role));
+        adminSessionService.put(token, new AdminSessionService.SessionUser(username, role, userId));
         return ApiResult.ok(Map.of("token", token));
+    }
+
+    /** Mobile 登录：仅允许 student/teacher，与 admin 共用 users 表与 Session 存储 */
+    @PostMapping("/auth/mobile-login")
+    public ApiResult<Map<String, Object>> mobileLogin(@RequestBody Map<String, String> body) {
+        String username = body.get("username") == null ? "" : body.get("username").trim();
+        String password = body.get("password") == null ? "" : body.get("password");
+        if (username.isEmpty() || password.isEmpty()) {
+            return ApiResult.fail(400, "用户名和密码不能为空");
+        }
+
+        Map<String, Object> row;
+        try {
+            row = jdbcTemplate.queryForMap(
+                    "select id, username, password, role, is_deleted from users where username = ? limit 1",
+                    username
+            );
+        } catch (Exception e) {
+            return ApiResult.fail(401, "用户名或密码错误");
+        }
+
+        Object isDeletedValue = row.get("is_deleted");
+        boolean isDeleted = false;
+        if (isDeletedValue instanceof Boolean b) {
+            isDeleted = b;
+        } else if (isDeletedValue instanceof Number n) {
+            isDeleted = n.intValue() == 1;
+        }
+        if (isDeleted) {
+            return ApiResult.fail(401, "用户已被禁用");
+        }
+
+        String dbPassword = row.get("password") == null ? "" : String.valueOf(row.get("password"));
+        if (!dbPassword.equals(password)) {
+            return ApiResult.fail(401, "用户名或密码错误");
+        }
+
+        String role = row.get("role") == null ? "" : String.valueOf(row.get("role")).trim().toLowerCase();
+        if (!"student".equals(role) && !"teacher".equals(role)) {
+            return ApiResult.fail(403, "仅学生/教师可使用移动端登录");
+        }
+
+        Long userId = row.get("id") != null ? ((Number) row.get("id")).longValue() : null;
+        String token = "scs-mobile-token-" + UUID.randomUUID();
+        adminSessionService.put(token, new AdminSessionService.SessionUser(username, role, userId));
+        return ApiResult.ok(Map.of(
+                "token", token,
+                "username", username,
+                "id", userId != null ? userId : 0
+        ));
     }
 
     private static String generateCaptchaImageBase64(String text) {

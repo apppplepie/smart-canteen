@@ -33,6 +33,21 @@ export function HistoryOrdersPage({
   const [loading, setLoading] = useState(!!getBaseUrl());
   const [search, setSearch] = useState("");
 
+  const orderStatusToChinese = (status: string): string => {
+    const s = (status ?? "").toLowerCase();
+    if (s === "pending" || s === "待接单") return "待接单";
+    if (s === "confirmed" || s === "已接单") return "已接单";
+    if (s === "preparing" || s === "cooking" || s === "制作中") return "制作中";
+    if (s === "ready" || s === "待取餐") return "请取餐";
+    if (s === "completed" || s === "已完成" || s === "done") return "已完成";
+    return status || "已完成";
+  };
+
+  const isOrderCompleted = (status: string): boolean => {
+    const s = (status ?? "").toLowerCase();
+    return s === "completed" || s === "已完成" || s === "done";
+  };
+
   useEffect(() => {
     const base = getBaseUrl();
     if (!base || userId == null) {
@@ -46,17 +61,19 @@ export function HistoryOrdersPage({
         if (cancelled) return;
         const vendors = await listVendors();
         const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
-        const rows: OrderRow[] = list.map((o) => ({
-          id: o.id,
-          name: vendorMap.get(o.vendorId ?? 0) ?? "订单",
-          time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
-          price: String(o.totalAmount),
-          status: o.status ?? "已完成",
-          image: `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
-          items: `¥${o.totalAmount}`,
-          vendorId: o.vendorId,
-          totalAmount: Number(o.totalAmount),
-        }));
+        const rows: OrderRow[] = list
+          .filter((o) => isOrderCompleted(o.status ?? ""))
+          .map((o) => ({
+            id: o.id,
+            name: vendorMap.get(o.vendorId ?? 0) ?? "订单",
+            time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
+            price: String(o.totalAmount),
+            status: orderStatusToChinese(o.status ?? "已完成"),
+            image: `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
+            items: `¥${o.totalAmount}`,
+            vendorId: o.vendorId,
+            totalAmount: Number(o.totalAmount),
+          }));
         setOrders(rows.length ? rows : historyOrdersFallbackMock);
       } catch {
         if (!cancelled) setOrders(historyOrdersFallbackMock);
@@ -116,24 +133,24 @@ export function HistoryOrdersPage({
                 >
                   <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-50">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-900">{order.name}</span>
-                      <ChevronRight size={16} className="text-gray-400" />
+                      <span className="font-bold text-gray-900 text-base">{order.name}</span>
+                      <ChevronRight size={18} className="text-gray-400" />
                     </div>
-                    <span className="text-sm text-gray-500">{order.status}</span>
+                    <span className="text-base text-gray-600 font-medium">{order.status}</span>
                   </div>
 
                   <div className="flex gap-4">
                     <img
                       src={order.image}
                       alt={order.name}
-                      className="w-16 h-16 rounded-xl object-cover"
+                      className="w-20 h-20 rounded-xl object-cover"
                       referrerPolicy="no-referrer"
                     />
                     <div className="flex-1 flex flex-col justify-between">
-                      <div className="text-sm text-gray-600">{order.items}</div>
+                      <div className="text-base text-gray-600">{order.items}</div>
                       <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-gray-400">{order.time}</span>
-                        <span className="font-bold text-gray-900">¥{order.price}</span>
+                        <span className="text-sm text-gray-400">{order.time}</span>
+                        <span className="font-bold text-gray-900 text-base">¥{order.price}</span>
                       </div>
                     </div>
                   </div>

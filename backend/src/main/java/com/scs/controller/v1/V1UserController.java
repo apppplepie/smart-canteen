@@ -22,10 +22,16 @@ public class V1UserController {
     @GetMapping("/users/me")
     public ApiResult<Map<String, Object>> me(HttpServletRequest request) {
         return CurrentUserHolder.getCurrentSessionUser(request)
-                .map(sessionUser -> ApiResult.ok(Map.of(
-                        "username", sessionUser.username(),
-                        "roles", List.of(sessionUser.role())
-                )))
+                .map(sessionUser -> {
+                    Map<String, Object> data = new java.util.HashMap<>(Map.of(
+                            "username", sessionUser.username(),
+                            "roles", List.of(sessionUser.role())
+                    ));
+                    if (sessionUser.userId() != null) {
+                        data.put("id", sessionUser.userId());
+                    }
+                    return ApiResult.ok(data);
+                })
                 .orElse(ApiResult.fail(401, "未登录或登录已失效"));
     }
 }

@@ -90,12 +90,12 @@ export function LoginPage({ onBack, onLogin }: LoginPageProps) {
               <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="请输入学号/工号"
+                placeholder="请输入姓名"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#FF6B6B]/20 focus:border-[#FF6B6B] transition-all"
                 required
-                autoComplete="username"
+                autoComplete="name"
               />
             </div>
             <div className="relative">
