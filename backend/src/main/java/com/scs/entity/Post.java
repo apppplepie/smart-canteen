@@ -65,6 +65,10 @@ public class Post {
 
     @Transient
     private Boolean likedByCurrentUser;
+    @Transient
+    private String userDisplayName;
+    @Transient
+    private String userImageUrl;
 
     @PrePersist
     protected void onCreate() {
@@ -107,4 +111,8 @@ public class Post {
     public void setVendorId(Long vendorId) { this.vendorId = vendorId; }
     public Boolean getLikedByCurrentUser() { return likedByCurrentUser; }
     public void setLikedByCurrentUser(Boolean likedByCurrentUser) { this.likedByCurrentUser = likedByCurrentUser; }
+    public String getUserDisplayName() { return userDisplayName; }
+    public void setUserDisplayName(String userDisplayName) { this.userDisplayName = userDisplayName; }
+    public String getUserImageUrl() { return userImageUrl; }
+    public void setUserImageUrl(String userImageUrl) { this.userImageUrl = userImageUrl; }
 }

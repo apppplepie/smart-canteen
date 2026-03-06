@@ -147,13 +147,13 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
         />
       )}
       <div className="p-4">
-        {post.merchantName && (
+        {post.merchantName != null && post.merchantName !== "" && (
           <div className="flex items-center gap-1 text-[10px] text-[#FF6B6B] bg-red-50 w-fit px-2 py-1 rounded-md mb-2">
             <MapPin size={10} />
             <span>{post.merchantName}{post.dishName ? ` · ${post.dishName}` : ""}</span>
           </div>
         )}
-        {post.tags && post.tags.length > 0 && (
+        {post.tags != null && post.tags.length > 0 && (
           <div className="flex gap-2 mb-2">
             {post.tags.map((tag: string) => (
               <span key={tag} className={cn("text-[10px] px-2 py-1 rounded-md font-bold", tag === "寻物启事" ? "bg-orange-50 text-orange-500" : tag === "失物招领" ? "bg-blue-50 text-blue-500" : tag === "问题反馈" ? "bg-red-50 text-[#FF6B6B]" : "bg-gray-50 text-gray-500")}>
@@ -163,23 +163,29 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
           </div>
         )}
         <p className="text-sm text-gray-800 line-clamp-3 mb-3 leading-relaxed">
-          {post.content}
+          {post.content ?? ""}
         </p>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img
               src={post.user?.avatar ?? "https://api.dicebear.com/7.x/avataaars/svg?seed=u"}
               alt={post.user?.name ?? "用户"}
-              className="w-6 h-6 rounded-full"
+              className="w-6 h-6 rounded-full object-cover"
               referrerPolicy="no-referrer"
             />
             <span className="text-xs text-gray-500 font-medium">
               {post.user?.name ?? "用户"}
             </span>
           </div>
-          <div className="flex items-center gap-1 text-gray-400">
-            <Heart size={14} className="hover:text-red-500 cursor-pointer transition-colors" />
-            <span className="text-xs">{post.likes ?? 0}</span>
+          <div className="flex items-center gap-3 text-gray-400">
+            <span className="flex items-center gap-0.5">
+              <Heart size={14} />
+              <span className="text-xs">{post.likes ?? 0}</span>
+            </span>
+            <span className="flex items-center gap-0.5">
+              <MessageCircle size={14} />
+              <span className="text-xs">{post.comments ?? 0}</span>
+            </span>
           </div>
         </div>
       </div>

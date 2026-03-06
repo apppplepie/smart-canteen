@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, Share2, MapPin, Heart, MessageCircle, Loader2 } from "lucide-react";
-import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import { getBaseUrl } from "../api/client";
 import { getPost, likePost, unlikePost } from "../api/posts";
@@ -116,6 +115,8 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
     }
   };
 
+  const canSendComment = !!commentText.trim() && currentUserId != null && !submittingComment;
+
   return (
     <div className="flex-1 overflow-y-auto pb-24 bg-white relative z-20">
       <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b border-gray-100 sticky top-0 bg-white z-10">
@@ -193,50 +194,38 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
               ))}
             </ul>
           )}
-          <div className="flex gap-3">
-            <img
-              src={currentUserId ? "https://api.dicebear.com/7.x/avataaars/svg?seed=" + currentUserId : "https://api.dicebear.com/7.x/avataaars/svg?seed=anon"}
-              className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
-              referrerPolicy="no-referrer"
-              alt=""
-            />
-            <div className="flex-1 flex gap-2">
-              <input
-                type="text"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder="说点什么..."
-                className="flex-1 bg-gray-50 rounded-2xl px-4 py-2 text-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-[#FF6B6B]/30"
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmitComment()}
-              />
-              <button
-                disabled={!commentText.trim() || submittingComment}
-                onClick={handleSubmitComment}
-                className="px-4 py-2 bg-[#FF6B6B] text-white text-sm font-medium rounded-2xl disabled:opacity-50 flex items-center gap-1"
-              >
-                {submittingComment ? <Loader2 size={16} className="animate-spin" /> : null}
-                发送
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-safe flex items-center justify-between px-6 z-50">
-        <div className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm text-gray-500 mr-4">
-          说点什么...
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-safe flex items-center gap-3 px-4 z-50">
+        <div className="flex-1 flex items-center bg-gray-100 rounded-full pl-4 pr-2 py-1.5 min-h-10">
+          <input
+            type="text"
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="说点什么..."
+            className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-500 focus:outline-none min-w-0"
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmitComment()}
+          />
         </div>
-        <div className="flex items-center gap-6 text-gray-600">
+        <button
+          disabled={!canSendComment}
+          onClick={handleSubmitComment}
+          className="flex-shrink-0 px-4 py-2 bg-[#FF6B6B] text-white text-sm font-medium rounded-full disabled:opacity-50 flex items-center gap-1"
+        >
+          {submittingComment ? <Loader2 size={18} className="animate-spin" /> : "发送"}
+        </button>
+        <div className="flex items-center gap-4 text-gray-600 flex-shrink-0">
           <button
             onClick={handleLike}
             disabled={!hasApi || currentUserId == null || togglingLike}
             className={cn("flex items-center gap-1 transition-colors", liked ? "text-red-500" : "hover:text-red-400")}
           >
-            {togglingLike ? <Loader2 size={24} className="animate-spin" /> : <Heart size={24} className={liked ? "fill-current" : ""} />}
+            {togglingLike ? <Loader2 size={22} className="animate-spin" /> : <Heart size={22} className={liked ? "fill-current" : ""} />}
             <span className="text-sm">{likeCount}</span>
           </button>
           <div className="flex items-center gap-1">
-            <MessageCircle size={24} />
+            <MessageCircle size={22} />
             <span className="text-sm">{commentCount}</span>
           </div>
         </div>

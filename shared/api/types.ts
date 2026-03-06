@@ -70,6 +70,10 @@ export interface PostDto {
   commentCount?: number;
   /** 当前用户是否已点赞（仅 get 单条时可能返回） */
   likedByCurrentUser?: boolean;
+  /** 发帖用户展示名（列表/详情时由后端填充） */
+  userDisplayName?: string;
+  /** 发帖用户头像 URL（列表/详情时由后端填充） */
+  userImageUrl?: string;
   status?: string;
   replyContent?: string;
   /** AI建议（预留，可为空） */

@@ -32,23 +32,27 @@ public class PostController {
 
     @GetMapping
     public List<Post> list(@RequestParam(required = false) String postType) {
-        if (postType != null && !postType.isBlank()) {
-            return repo.findByPostTypeOrderByCreatedAtDesc(postType.trim());
-        }
-        return repo.findAll();
+        List<Post> list = postType != null && !postType.isBlank()
+                ? repo.findByPostTypeOrderByCreatedAtDesc(postType.trim())
+                : repo.findAll();
+        enrichWithUser(list);
+        return list;
     }
 
     @GetMapping("/user/{userId}")
     public List<Post> listByUser(@PathVariable Long userId, @RequestParam(required = false) String postType) {
-        if (postType != null && !postType.isBlank()) {
-            return repo.findByUser_IdAndPostTypeOrderByCreatedAtDesc(userId, postType.trim());
-        }
-        return repo.findByUser_IdOrderByCreatedAtDesc(userId);
+        List<Post> list = postType != null && !postType.isBlank()
+                ? repo.findByUser_IdAndPostTypeOrderByCreatedAtDesc(userId, postType.trim())
+                : repo.findByUser_IdOrderByCreatedAtDesc(userId);
+        enrichWithUser(list);
+        return list;
     }
 
     @GetMapping("/vendor/{vendorId}")
     public List<Post> listByVendor(@PathVariable Long vendorId) {
-        return repo.findByVendor_IdOrderByCreatedAtDesc(vendorId);
+        List<Post> list = repo.findByVendor_IdOrderByCreatedAtDesc(vendorId);
+        enrichWithUser(list);
+        return list;
     }
 
     @GetMapping("/{id}")
@@ -59,6 +63,7 @@ public class PostController {
                     if (userId != null && likeRepo.existsByPost_IdAndUser_Id(post.getId(), userId)) {
                         post.setLikedByCurrentUser(true);
                     }
+                    enrichWithUser(java.util.Collections.singletonList(post));
                     return ResponseEntity.ok(post);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -138,5 +143,17 @@ public class PostController {
         Long vid = entity.getVendorId();
         if (uid != null) userRepo.findById(uid).ifPresent(entity::setUser);
         if (vid != null) vendorRepo.findById(vid).ifPresent(entity::setVendor);
+    }
+
+    private void enrichWithUser(List<Post> list) {
+        for (Post p : list) {
+            if (p.getUser() != null) {
+                var u = p.getUser();
+                String name = u.getDisplayName();
+                if (name == null || name.isBlank()) name = u.getUsername();
+                p.setUserDisplayName(name);
+                p.setUserImageUrl(u.getImageUrl());
+            }
+        }
     }
 }
