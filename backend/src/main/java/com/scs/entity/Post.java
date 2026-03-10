@@ -70,6 +70,11 @@ public class Post {
     @Transient
     private String userImageUrl;
 
+    @Column(name = "vendor_review_id")
+    private Long vendorReviewId;
+    @Transient
+    private Integer rating; // 1-5，来自关联的 vendor_review
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -115,4 +120,8 @@ public class Post {
     public void setUserDisplayName(String userDisplayName) { this.userDisplayName = userDisplayName; }
     public String getUserImageUrl() { return userImageUrl; }
     public void setUserImageUrl(String userImageUrl) { this.userImageUrl = userImageUrl; }
+    public Long getVendorReviewId() { return vendorReviewId; }
+    public void setVendorReviewId(Long vendorReviewId) { this.vendorReviewId = vendorReviewId; }
+    public Integer getRating() { return rating; }
+    public void setRating(Integer rating) { this.rating = rating; }
 }

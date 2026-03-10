@@ -156,7 +156,10 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
     return list;
   }, [posts, activeTab]);
 
-  const renderPost = (post: SharedPost & { height?: string }) => (
+  const renderPost = (post: SharedPost & { height?: string }) => {
+    const isLost = typeof post.id === "string" && String(post.id).startsWith("lost-");
+    const hasRating = post.rating != null && post.rating >= 1 && post.rating <= 5;
+    return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -165,12 +168,56 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
       className="break-inside-avoid mb-4 bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
     >
       {post.image && (
-        <img
-          src={post.image}
-          alt="Post"
-          className={`w-full object-cover ${(post as { height?: string }).height ?? "h-48"}`}
-          referrerPolicy="no-referrer"
-        />
+        <div className="relative">
+          <img
+            src={post.image}
+            alt="Post"
+            className={`w-full object-cover ${(post as { height?: string }).height ?? "h-48"}`}
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
+            {hasRating && (
+              <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-xs font-medium">
+                <Star size={12} className="text-amber-400 fill-amber-400" />
+                {post.rating}
+              </span>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              {!isLost && (
+                <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-xs">
+                  <Heart size={12} />
+                  {post.likes ?? 0}
+                </span>
+              )}
+              <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-xs">
+                <MessageCircle size={12} />
+                {post.comments ?? 0}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+      {!post.image && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+          {hasRating && (
+            <span className="flex items-center gap-1 text-amber-600 text-xs font-medium">
+              <Star size={12} className="fill-amber-400" />
+              {post.rating} 分
+            </span>
+          )}
+          <div className="flex items-center gap-2 ml-auto text-gray-500 text-xs">
+            {!isLost && (
+              <span className="flex items-center gap-0.5">
+                <Heart size={12} />
+                {post.likes ?? 0}
+              </span>
+            )}
+            <span className="flex items-center gap-0.5">
+              <MessageCircle size={12} />
+              {post.comments ?? 0}
+            </span>
+          </div>
+        </div>
       )}
       <div className="p-4">
         {post.merchantName != null && post.merchantName !== "" && (
@@ -225,7 +272,8 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
         </div>
       </div>
     </motion.div>
-  );
+    );
+  };
 
   return (
     <div className="h-full bg-gray-50 flex flex-col relative overflow-y-auto no-scrollbar pb-24">

@@ -338,6 +338,8 @@ CREATE TABLE `vendors`  (
   `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_active` tinyint(1) NULL DEFAULT 1,
+  `rating_avg` decimal(3,2) NULL DEFAULT NULL COMMENT '评分平均分，定时从 vendor_reviews 聚合',
+  `rating_count` int NULL DEFAULT 0 COMMENT '评分人数',
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
@@ -435,19 +437,24 @@ CREATE TABLE `vendor_reviews` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `user_id` bigint NOT NULL COMMENT '用户',
   `vendor_id` bigint NOT NULL COMMENT '商家',
-  `order_id` bigint DEFAULT NULL COMMENT '关联订单（可选）',
+  `order_id` bigint NOT NULL COMMENT '关联订单，必须为本人历史订单',
   `rating` tinyint NOT NULL COMMENT '1-5 星',
   `content` text COMMENT '评论内容，为空则仅评分不发布到食堂圈',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_vendor_reviews_order` (`order_id`),
   KEY `idx_vendor_reviews_user` (`user_id`),
   KEY `idx_vendor_reviews_vendor` (`vendor_id`),
   KEY `idx_vendor_reviews_created` (`created_at` DESC),
-  KEY `fk_vendor_reviews_order` (`order_id`),
-  CONSTRAINT `fk_vendor_reviews_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT,
+  CONSTRAINT `fk_vendor_reviews_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `fk_vendor_reviews_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `fk_vendor_reviews_vendor` FOREIGN KEY (`vendor_id`) REFERENCES `vendors` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商店评分：仅评分或评分+评论；有评论时同步到食堂圈';
+
+-- posts 关联商家评价（有评论时同步到食堂圈的那条评价的 id，用于展示打分）
+ALTER TABLE `posts` ADD COLUMN `vendor_review_id` bigint NULL DEFAULT NULL COMMENT '来自商家评价时关联' AFTER `created_at`;
+ALTER TABLE `posts` ADD INDEX `idx_posts_vendor_review` (`vendor_review_id`);
+ALTER TABLE `posts` ADD CONSTRAINT `posts_ibfk_vendor_review` FOREIGN KEY (`vendor_review_id`) REFERENCES `vendor_reviews` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT;
 
 -- ----------------------------
 -- Table structure for post_comments（帖子评论）

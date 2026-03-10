@@ -78,6 +78,8 @@ export interface PostDto {
   replyContent?: string;
   /** AI建议（预留，可为空） */
   aiSuggestion?: string;
+  /** 1-5 星，来自关联的商家评价（美食评价同步到食堂圈时） */
+  rating?: number;
   createdAt?: string;
 }
 

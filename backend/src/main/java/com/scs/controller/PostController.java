@@ -2,10 +2,12 @@ package com.scs.controller;
 
 import com.scs.entity.Post;
 import com.scs.entity.PostLike;
+import com.scs.entity.VendorReview;
 import com.scs.repository.PostLikeRepository;
 import com.scs.repository.PostRepository;
 import com.scs.repository.UserRepository;
 import com.scs.repository.VendorRepository;
+import com.scs.repository.VendorReviewRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,13 +23,15 @@ public class PostController {
     private final UserRepository userRepo;
     private final VendorRepository vendorRepo;
     private final PostLikeRepository likeRepo;
+    private final VendorReviewRepository vendorReviewRepo;
 
     public PostController(PostRepository repo, UserRepository userRepo, VendorRepository vendorRepo,
-                         PostLikeRepository likeRepo) {
+                         PostLikeRepository likeRepo, VendorReviewRepository vendorReviewRepo) {
         this.repo = repo;
         this.userRepo = userRepo;
         this.vendorRepo = vendorRepo;
         this.likeRepo = likeRepo;
+        this.vendorReviewRepo = vendorReviewRepo;
     }
 
     @GetMapping
@@ -36,6 +40,7 @@ public class PostController {
                 ? repo.findByPostTypeOrderByCreatedAtDesc(postType.trim())
                 : repo.findAll();
         enrichWithUser(list);
+        enrichWithRating(list);
         return list;
     }
 
@@ -45,6 +50,7 @@ public class PostController {
                 ? repo.findByUser_IdAndPostTypeOrderByCreatedAtDesc(userId, postType.trim())
                 : repo.findByUser_IdOrderByCreatedAtDesc(userId);
         enrichWithUser(list);
+        enrichWithRating(list);
         return list;
     }
 
@@ -52,6 +58,7 @@ public class PostController {
     public List<Post> listByVendor(@PathVariable Long vendorId) {
         List<Post> list = repo.findByVendor_IdOrderByCreatedAtDesc(vendorId);
         enrichWithUser(list);
+        enrichWithRating(list);
         return list;
     }
 
@@ -64,6 +71,7 @@ public class PostController {
                         post.setLikedByCurrentUser(true);
                     }
                     enrichWithUser(java.util.Collections.singletonList(post));
+                    enrichWithRating(java.util.Collections.singletonList(post));
                     return ResponseEntity.ok(post);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -153,6 +161,16 @@ public class PostController {
                 if (name == null || name.isBlank()) name = u.getUsername();
                 p.setUserDisplayName(name);
                 p.setUserImageUrl(u.getImageUrl());
+            }
+        }
+    }
+
+    private void enrichWithRating(List<Post> list) {
+        for (Post p : list) {
+            if (p.getVendorReviewId() != null) {
+                vendorReviewRepo.findById(p.getVendorReviewId())
+                        .map(VendorReview::getRating)
+                        .ifPresent(p::setRating);
             }
         }
     }

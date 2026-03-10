@@ -23,7 +23,7 @@ public class VendorReview {
     private Vendor vendor;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id")
+    @JoinColumn(name = "order_id", nullable = false)
     @JsonIgnore
     private Order order;
 

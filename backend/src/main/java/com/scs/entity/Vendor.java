@@ -38,9 +38,11 @@ public class Vendor {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    /** 展示用：无评分时为 4.5，有评分时为该商家所有评分的平均值，由 Controller 注入 */
-    @Transient
-    private Double averageRating;
+    @Column(name = "rating_avg", precision = 3, scale = 2)
+    private Double ratingAvg;
+
+    @Column(name = "rating_count")
+    private Integer ratingCount = 0;
 
     @OneToMany(mappedBy = "vendor", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
@@ -75,8 +77,13 @@ public class Vendor {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
-    public Double getAverageRating() { return averageRating; }
-    public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
+    public Double getRatingAvg() { return ratingAvg; }
+    public void setRatingAvg(Double ratingAvg) { this.ratingAvg = ratingAvg; }
+    public Integer getRatingCount() { return ratingCount; }
+    public void setRatingCount(Integer ratingCount) { this.ratingCount = ratingCount; }
+    /** 展示用：兼容旧字段名，返回 rating_avg */
+    public Double getAverageRating() { return ratingAvg; }
+    public void setAverageRating(Double averageRating) { this.ratingAvg = averageRating; }
     public List<MenuItem> getMenuItems() { return menuItems; }
     public void setMenuItems(List<MenuItem> menuItems) { this.menuItems = menuItems; }
 }

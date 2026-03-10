@@ -2,7 +2,6 @@ package com.scs.controller;
 
 import com.scs.entity.Vendor;
 import com.scs.repository.VendorRepository;
-import com.scs.repository.VendorReviewRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,19 +15,16 @@ public class VendorController {
     private static final double DEFAULT_RATING_WHEN_EMPTY = 4.5;
 
     private final VendorRepository repo;
-    private final VendorReviewRepository reviewRepo;
 
-    public VendorController(VendorRepository repo, VendorReviewRepository reviewRepo) {
+    public VendorController(VendorRepository repo) {
         this.repo = repo;
-        this.reviewRepo = reviewRepo;
     }
 
     @GetMapping
     public List<Vendor> list() {
         List<Vendor> list = repo.findAll();
         for (Vendor v : list) {
-            v.setAverageRating(reviewRepo.getAverageRatingByVendorId(v.getId())
-                    .orElse(DEFAULT_RATING_WHEN_EMPTY));
+            if (v.getRatingAvg() == null) v.setRatingAvg(DEFAULT_RATING_WHEN_EMPTY);
         }
         return list;
     }
@@ -37,8 +33,7 @@ public class VendorController {
     public ResponseEntity<Vendor> get(@PathVariable Long id) {
         return repo.findById(id)
                 .map(v -> {
-                    v.setAverageRating(reviewRepo.getAverageRatingByVendorId(v.getId())
-                            .orElse(DEFAULT_RATING_WHEN_EMPTY));
+                    if (v.getRatingAvg() == null) v.setRatingAvg(DEFAULT_RATING_WHEN_EMPTY);
                     return ResponseEntity.ok(v);
                 })
                 .orElse(ResponseEntity.notFound().build());

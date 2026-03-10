@@ -58,5 +58,6 @@ export function postToSharedPost(post: PostDto, vendorName?: string, baseUrl?: s
     merchantName: vendorName,
     dishName: undefined,
     tags: tags.length > 0 ? tags : undefined,
+    rating: post.rating != null && post.rating >= 1 && post.rating <= 5 ? post.rating : undefined,
   };
 }

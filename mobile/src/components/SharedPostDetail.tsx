@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, Share2, MapPin, Heart, MessageCircle, Loader2 } from "lucide-react";
+import { ChevronLeft, Share2, MapPin, Heart, MessageCircle, Loader2, Star } from "lucide-react";
 import { cn, getPostTagClassName } from "../lib/utils";
 import { getBaseUrl } from "../api/client";
 import { getPost, likePost, unlikePost } from "../api/posts";
@@ -27,6 +27,8 @@ export interface SharedPost {
   isFound?: boolean;
   isReturned?: boolean;
   likedByCurrentUser?: boolean;
+  /** 1-5 星，美食评价帖展示打分 */
+  rating?: number;
 }
 
 interface SharedPostDetailProps {
@@ -56,6 +58,9 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
   const [likeCount, setLikeCount] = useState(post.likes ?? 0);
   const [commentCount, setCommentCount] = useState(post.comments ?? 0);
   const [togglingLike, setTogglingLike] = useState(false);
+  const [ratingDisplay, setRatingDisplay] = useState<number | null>(
+    post.rating != null && post.rating >= 1 && post.rating <= 5 ? post.rating : null
+  );
 
   const loadComments = useCallback(async () => {
     if (!hasApi) return;
@@ -95,6 +100,7 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
           setLiked(!!p.likedByCurrentUser);
           if (p.likeCount != null) setLikeCount(p.likeCount);
           if (p.commentCount != null) setCommentCount(p.commentCount);
+          if (p.rating != null && p.rating >= 1 && p.rating <= 5) setRatingDisplay(p.rating);
         }
       }).catch(() => {});
     }
@@ -176,6 +182,22 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
             <span>{post.dishName}</span>
             <ChevronLeft size={16} className="rotate-180 ml-auto" />
           </button>
+        )}
+
+        {!isLostItem && ratingDisplay != null && ratingDisplay >= 1 && ratingDisplay <= 5 && (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-amber-50 rounded-xl w-fit">
+            <span className="text-sm font-medium text-gray-700">美食评分</span>
+            <span className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Star
+                  key={i}
+                  size={20}
+                  className={i <= ratingDisplay ? "text-amber-400 fill-amber-400" : "text-gray-200"}
+                />
+              ))}
+            </span>
+            <span className="text-sm font-bold text-amber-600">{ratingDisplay} 分</span>
+          </div>
         )}
 
         {post.tags && (
