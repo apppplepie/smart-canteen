@@ -60,7 +60,19 @@ export function HistoryOrdersPage({
         const list = await listOrdersByUser(userId);
         if (cancelled) return;
         const vendors = await listVendors();
+        const baseNorm = base.replace(/\/$/, "");
         const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
+        const vendorImageMap = new Map(
+          vendors.map((v) => {
+            const url =
+              v.imageUrl != null && v.imageUrl !== ""
+                ? v.imageUrl.startsWith("http")
+                  ? v.imageUrl
+                  : baseNorm + (v.imageUrl!.startsWith("/") ? v.imageUrl : "/" + v.imageUrl)
+                : `https://picsum.photos/seed/v${v.id}/100/100`;
+            return [v.id, url] as [number, string];
+          })
+        );
         const rows: OrderRow[] = list
           .filter((o) => isOrderCompleted(o.status ?? ""))
           .map((o) => ({
@@ -69,7 +81,7 @@ export function HistoryOrdersPage({
             time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
             price: String(o.totalAmount),
             status: orderStatusToChinese(o.status ?? "已完成"),
-            image: `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
+            image: vendorImageMap.get(o.vendorId ?? 0) ?? `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
             items: `¥${o.totalAmount}`,
             vendorId: o.vendorId,
             totalAmount: Number(o.totalAmount),
@@ -84,8 +96,9 @@ export function HistoryOrdersPage({
     return () => { cancelled = true; };
   }, [userId]);
 
-  const filtered = search.trim()
-    ? orders.filter((o) => o.name.includes(search) || o.items.includes(search))
+  const searchLower = search.trim().toLowerCase();
+  const filtered = searchLower
+    ? orders.filter((o) => o.name.toLowerCase().includes(searchLower))
     : orders;
 
   return (

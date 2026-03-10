@@ -75,6 +75,7 @@ export function ProfileTab({
     if (s === "confirmed" || s === "已接单") return "已接单";
     if (s === "preparing" || s === "cooking" || s === "制作中") return "制作中";
     if (s === "ready" || s === "待取餐") return "请取餐";
+    if (s === "completed" || s === "已完成" || s === "done") return "已完成";
     return status || "进行中";
   };
 
@@ -102,13 +103,25 @@ export function ProfileTab({
         const [list, vendors] = await Promise.all([listOrdersByUser(uid), listVendors()]);
         if (cancelled) return;
         const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
+        const baseNorm = base.replace(/\/$/, "");
+        const vendorImageMap = new Map(
+          vendors.map((v) => {
+            const url =
+              v.imageUrl != null && v.imageUrl !== ""
+                ? v.imageUrl.startsWith("http")
+                  ? v.imageUrl
+                  : baseNorm + (v.imageUrl!.startsWith("/") ? v.imageUrl : "/" + v.imageUrl)
+                : `https://picsum.photos/seed/v${v.id}/100/100`;
+            return [v.id, url] as [number, string];
+          })
+        );
         const completedList = list.filter((o) => isOrderCompleted(o));
         const rows = completedList.slice(0, 3).map((o) => ({
           name: vendorMap.get(o.vendorId ?? 0) ?? "订单",
           time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
           price: String(o.totalAmount),
           status: orderStatusLabel(o.status ?? "已完成"),
-          image: `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
+          image: vendorImageMap.get(o.vendorId ?? 0) ?? `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
         }));
         setRecentOrders(rows);
         const active = list

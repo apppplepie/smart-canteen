@@ -40,6 +40,7 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
   const userDisplay = post.user || { name: "匿名用户", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=anon" };
   const postId = Number(post.id);
   const hasApi = !!getBaseUrl();
+  const apiBase = (getBaseUrl() ?? "").replace(/\/$/, "");
 
   const [comments, setComments] = useState<PostCommentDto[]>([]);
   const [loadingComments, setLoadingComments] = useState(hasApi && !Number.isNaN(postId));
@@ -177,10 +178,17 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
             </div>
           ) : (
             <ul className="space-y-4 mb-4">
-              {comments.map((c) => (
+              {comments.map((c) => {
+                const avatarSrc =
+                  c.userImageUrl != null && c.userImageUrl !== ""
+                    ? c.userImageUrl.startsWith("http")
+                      ? c.userImageUrl
+                      : apiBase + (c.userImageUrl.startsWith("/") ? c.userImageUrl : "/" + c.userImageUrl)
+                    : "https://api.dicebear.com/7.x/avataaars/svg?seed=" + (c.userId ?? "u");
+                return (
                 <li key={c.id} className="flex gap-3">
                   <img
-                    src={c.userImageUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + (c.userId ?? "u")}
+                    src={avatarSrc}
                     className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
                     referrerPolicy="no-referrer"
                     alt=""
@@ -191,7 +199,8 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
                     <p className="text-sm text-gray-800 mt-0.5 break-words">{c.content}</p>
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>
