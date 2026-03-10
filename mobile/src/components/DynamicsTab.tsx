@@ -6,14 +6,17 @@ import {
   ChevronLeft,
   Star,
   Loader2,
+  Search,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { PublishPage } from "./PublishPage";
 import { MerchantPage } from "./MerchantPage";
 import { THEME } from "../config/theme";
-import { cn } from "../lib/utils";
+import { cn, getPostTagClassName } from "../lib/utils";
 import { SharedPostDetail } from "./SharedPostDetail";
 import { listPosts, listVendors, createVendorReview } from "../api";
+import { listLostItems } from "../api/lostItems";
+import { lostItemToSharedPost } from "../api/mapLostItem";
 import { listOrdersByUser } from "../api/orders";
 import { listOrderItemsByOrder } from "../api/orderItems";
 import { getMenuItem } from "../api/menuItems";
@@ -37,6 +40,7 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
   const [selectedPost, setSelectedPost] = useState<SharedPost | null>(null);
   const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
   const [posts, setPosts] = useState<SharedPost[]>(dynamicsPostsFallbackMock);
+  const [latestLostItem, setLatestLostItem] = useState<SharedPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
   const [submittingRating, setSubmittingRating] = useState(false);
@@ -49,16 +53,33 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
     if (!baseUrl) return;
     try {
       const [postList, vendorList] = await Promise.all([
-        listPosts({ postType: "dynamics" }),
+        listPosts(), // 不传 postType，拉取数据库全部帖子
         listVendors(),
       ]);
       const vendorMap = new Map(vendorList.map((v) => [v.id, v.name]));
-      const mapped = postList.map((p) => postToSharedPost(p, vendorMap.get(p.vendorId ?? 0), baseUrl));
+      const sorted = [...postList].sort((a, b) => {
+        const ta = a.createdAt ?? "";
+        const tb = b.createdAt ?? "";
+        return tb.localeCompare(ta);
+      });
+      const mapped = sorted.map((p) => postToSharedPost(p, vendorMap.get(p.vendorId ?? 0), baseUrl));
       setPosts(mapped);
     } catch {
       setPosts(dynamicsPostsFallbackMock);
     }
   }, [baseUrl]);
+
+  const fetchLatestLost = React.useCallback(async () => {
+    if (!apiBase) return;
+    try {
+      const list = await listLostItems();
+      const latest = list[0];
+      if (latest) setLatestLostItem(lostItemToSharedPost(latest, apiBase));
+      else setLatestLostItem(null);
+    } catch {
+      setLatestLostItem(null);
+    }
+  }, [apiBase]);
 
   useEffect(() => {
     if (!baseUrl) {
@@ -73,6 +94,11 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
     })();
     return () => { cancelled = true; };
   }, [baseUrl, fetchPosts]);
+
+  useEffect(() => {
+    if (!apiBase) return;
+    fetchLatestLost();
+  }, [apiBase, fetchLatestLost]);
 
   const fetchHistoryDish = React.useCallback(async () => {
     if (!apiBase || user?.userId == null) return;
@@ -156,7 +182,7 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
         {post.tags != null && post.tags.length > 0 && (
           <div className="flex gap-2 mb-2">
             {post.tags.map((tag: string) => (
-              <span key={tag} className={cn("text-[10px] px-2 py-1 rounded-md font-bold", tag === "寻物启事" ? "bg-orange-50 text-orange-500" : tag === "失物招领" ? "bg-blue-50 text-blue-500" : tag === "问题反馈" ? "bg-red-50 text-[#FF6B6B]" : "bg-gray-50 text-gray-500")}>
+              <span key={tag} className={cn("text-[10px] px-2 py-1 rounded-md font-bold", getPostTagClassName(tag))}>
                 {tag}
               </span>
             ))}
@@ -356,6 +382,18 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
           </div>
         ) : (
           <div className="columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
+            {latestLostItem && (
+              <div
+                className="break-inside-avoid mb-4 relative cursor-pointer"
+                onClick={() => setSelectedPost(latestLostItem)}
+              >
+                <div className="absolute top-3 left-3 z-10 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500 text-white text-[10px] font-bold shadow-sm">
+                  <Search size={12} />
+                  寻物启事 · 置顶
+                </div>
+                {renderPost(latestLostItem)}
+              </div>
+            )}
             {filteredPosts.map(renderPost)}
           </div>
         )}

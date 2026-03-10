@@ -9,5 +9,6 @@ export * from "./menuItems";
 export * from "./orders";
 export * from "./orderItems";
 export * from "./lostItems";
+export * from "./lostItemComments";
 export * from "./foundItems";
 export * from "./mapPost";

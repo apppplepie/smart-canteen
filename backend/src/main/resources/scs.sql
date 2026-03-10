@@ -411,6 +411,23 @@ CREATE TABLE `lost_items` (
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '遗失登记' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
+-- Table structure for lost_item_comments（寻物启事评论）
+-- ----------------------------
+DROP TABLE IF EXISTS `lost_item_comments`;
+CREATE TABLE `lost_item_comments` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `lost_item_id` bigint NOT NULL COMMENT '寻物启事',
+  `user_id` bigint NOT NULL COMMENT '评论用户',
+  `content` text NOT NULL COMMENT '评论内容',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_lost_item_comments_lost` (`lost_item_id`),
+  KEY `idx_lost_item_comments_created` (`created_at` DESC),
+  CONSTRAINT `fk_lost_item_comments_lost` FOREIGN KEY (`lost_item_id`) REFERENCES `lost_items` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `fk_lost_item_comments_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='寻物启事评论';
+
+-- ----------------------------
 -- Table structure for vendor_reviews（商店评分：仅评分或评分+评论；有评论时同步到食堂圈）
 -- ----------------------------
 DROP TABLE IF EXISTS `vendor_reviews`;

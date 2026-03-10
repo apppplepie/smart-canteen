@@ -13,3 +13,6 @@ target/
 bin/
 
 .DS_Store
+
+# 本地迁移脚本目录，不提交
+src/main/resources/db/

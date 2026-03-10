@@ -97,6 +97,7 @@ export interface LostItemDto {
   itemName: string;
   location?: string;
   description?: string;
+  imageUrl?: string;
   createdAt?: string;
 }
 

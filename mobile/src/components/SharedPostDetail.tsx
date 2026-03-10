@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, Share2, MapPin, Heart, MessageCircle, Loader2 } from "lucide-react";
-import { cn } from "../lib/utils";
+import { cn, getPostTagClassName } from "../lib/utils";
 import { getBaseUrl } from "../api/client";
 import { getPost, likePost, unlikePost } from "../api/posts";
 import { listPostComments, createPostComment, type PostCommentDto } from "../api/postComments";
+import { listLostItemComments, createLostItemComment, type LostItemCommentDto } from "../api/lostItemComments";
 import { formatRelativeTime } from "../lib/utils";
 
 export interface SharedPost {
@@ -40,10 +41,15 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
   const userDisplay = post.user || { name: "匿名用户", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=anon" };
   const postId = Number(post.id);
   const hasApi = !!getBaseUrl();
+  const isLostItem = typeof post.id === "string" && String(post.id).startsWith("lost-");
+  const lostItemId = isLostItem ? parseInt(String(post.id).replace(/^lost-/, ""), 10) : NaN;
   const apiBase = (getBaseUrl() ?? "").replace(/\/$/, "");
 
-  const [comments, setComments] = useState<PostCommentDto[]>([]);
-  const [loadingComments, setLoadingComments] = useState(hasApi && !Number.isNaN(postId));
+  type CommentRow = PostCommentDto | LostItemCommentDto;
+  const [comments, setComments] = useState<CommentRow[]>([]);
+  const [loadingComments, setLoadingComments] = useState(
+    hasApi && (isLostItem ? !Number.isNaN(lostItemId) : !Number.isNaN(postId))
+  );
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [liked, setLiked] = useState(!!post.likedByCurrentUser);
@@ -52,7 +58,21 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
   const [togglingLike, setTogglingLike] = useState(false);
 
   const loadComments = useCallback(async () => {
-    if (!hasApi || Number.isNaN(postId)) return;
+    if (!hasApi) return;
+    if (isLostItem) {
+      if (Number.isNaN(lostItemId)) return;
+      setLoadingComments(true);
+      try {
+        const list = await listLostItemComments(lostItemId);
+        setComments(list);
+      } catch {
+        setComments([]);
+      } finally {
+        setLoadingComments(false);
+      }
+      return;
+    }
+    if (Number.isNaN(postId)) return;
     setLoadingComments(true);
     try {
       const list = await listPostComments(postId);
@@ -62,7 +82,7 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
     } finally {
       setLoadingComments(false);
     }
-  }, [hasApi, postId]);
+  }, [hasApi, postId, isLostItem, lostItemId]);
 
   useEffect(() => {
     loadComments();
@@ -102,10 +122,16 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
 
   const handleSubmitComment = async () => {
     const text = commentText.trim();
-    if (!text || currentUserId == null || !hasApi || Number.isNaN(postId) || submittingComment) return;
+    if (!text || currentUserId == null || !hasApi || submittingComment) return;
+    if (isLostItem && Number.isNaN(lostItemId)) return;
+    if (!isLostItem && Number.isNaN(postId)) return;
     setSubmittingComment(true);
     try {
-      await createPostComment({ postId, userId: currentUserId, content: text });
+      if (isLostItem) {
+        await createLostItemComment({ lostItemId, userId: currentUserId, content: text });
+      } else {
+        await createPostComment({ postId, userId: currentUserId, content: text });
+      }
       setCommentText("");
       setCommentCount((c) => c + 1);
       await loadComments();
@@ -116,7 +142,11 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
     }
   };
 
-  const canSendComment = !!commentText.trim() && currentUserId != null && !submittingComment;
+  const canSendComment =
+    !!commentText.trim() &&
+    currentUserId != null &&
+    !submittingComment &&
+    (isLostItem ? !Number.isNaN(lostItemId) : true);
 
   return (
     <div className="flex-1 overflow-y-auto pb-24 bg-white relative z-20">
@@ -155,7 +185,7 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
                 key={tag}
                 className={cn(
                   "text-xs px-3 py-1 rounded-lg font-bold",
-                  tag === "寻物启事" ? "bg-orange-50 text-orange-500" : tag === "失物招领" ? "bg-blue-50 text-blue-500" : tag === "问题反馈" ? "bg-red-50 text-[#FF6B6B]" : "bg-gray-50 text-gray-500"
+                  getPostTagClassName(tag)
                 )}
               >
                 {tag}
@@ -171,7 +201,7 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
         <div className="text-sm text-gray-400 mb-6 mt-4">{timeDisplay}</div>
 
         <div className="border-t border-gray-100 pt-6">
-          <h3 className="font-bold text-gray-900 mb-4">共 {commentCount} 条评论</h3>
+          <h3 className="font-bold text-gray-900 mb-4">共 {comments.length} 条评论</h3>
           {loadingComments ? (
             <div className="flex justify-center py-4">
               <Loader2 size={20} className="animate-spin text-gray-400" />
@@ -225,17 +255,19 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
           {submittingComment ? <Loader2 size={18} className="animate-spin" /> : "发送"}
         </button>
         <div className="flex items-center gap-4 text-gray-600 flex-shrink-0">
-          <button
-            onClick={handleLike}
-            disabled={!hasApi || currentUserId == null || togglingLike}
-            className={cn("flex items-center gap-1 transition-colors", liked ? "text-red-500" : "hover:text-red-400")}
-          >
-            {togglingLike ? <Loader2 size={22} className="animate-spin" /> : <Heart size={22} className={liked ? "fill-current" : ""} />}
-            <span className="text-sm">{likeCount}</span>
-          </button>
+          {!isLostItem && (
+            <button
+              onClick={handleLike}
+              disabled={!hasApi || currentUserId == null || togglingLike}
+              className={cn("flex items-center gap-1 transition-colors", liked ? "text-red-500" : "hover:text-red-400")}
+            >
+              {togglingLike ? <Loader2 size={22} className="animate-spin" /> : <Heart size={22} className={liked ? "fill-current" : ""} />}
+              <span className="text-sm">{likeCount}</span>
+            </button>
+          )}
           <div className="flex items-center gap-1">
             <MessageCircle size={22} />
-            <span className="text-sm">{commentCount}</span>
+            <span className="text-sm">{comments.length}</span>
           </div>
         </div>
       </div>

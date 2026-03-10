@@ -31,6 +31,20 @@ export function postToSharedPost(post: PostDto, vendorName?: string, baseUrl?: s
       : defaultAvatar;
   const content = (post.content ?? "").trim();
   const title = (post.title ?? "").trim();
+  const fullText = (title + "\n" + content).toLowerCase();
+  const tags: string[] = [];
+  if (post.postType === "feedback") {
+    const feedbackLabels: Record<string, string> = {
+      food: "菜品建议",
+      service: "服务态度",
+      env: "环境卫生",
+      other: "其他",
+    };
+    tags.push(feedbackLabels[post.feedbackType ?? ""] ?? "问题反馈");
+  }
+  if (fullText.includes("寻物启事")) tags.push("寻物启事");
+  if (fullText.includes("失物招领")) tags.push("失物招领");
+
   return {
     id: post.id,
     user: { name: post.userDisplayName ?? "用户", avatar },
@@ -43,6 +57,6 @@ export function postToSharedPost(post: PostDto, vendorName?: string, baseUrl?: s
     merchantId: post.vendorId,
     merchantName: vendorName,
     dishName: undefined,
-    tags: undefined,
+    tags: tags.length > 0 ? tags : undefined,
   };
 }

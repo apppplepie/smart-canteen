@@ -38,6 +38,7 @@ export * from "./posts";
 export * from "./postComments";
 export * from "./orders";
 export * from "./lostItems";
+export * from "./lostItemComments";
 export * from "./foundItems";
 export * from "./orderItems";
 export * from "./queueEntries";
