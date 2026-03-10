@@ -98,6 +98,7 @@ export interface LostItemDto {
   location?: string;
   description?: string;
   imageUrl?: string;
+  commentCount?: number;
   createdAt?: string;
 }
 

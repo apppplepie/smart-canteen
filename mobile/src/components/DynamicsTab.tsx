@@ -204,14 +204,23 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
             </span>
           </div>
           <div className="flex items-center gap-3 text-gray-400">
-            <span className="flex items-center gap-0.5">
-              <Heart size={14} />
-              <span className="text-xs">{post.likes ?? 0}</span>
-            </span>
-            <span className="flex items-center gap-0.5">
-              <MessageCircle size={14} />
-              <span className="text-xs">{post.comments ?? 0}</span>
-            </span>
+            {typeof post.id !== "string" || !String(post.id).startsWith("lost-") ? (
+              <>
+                <span className="flex items-center gap-0.5">
+                  <Heart size={14} />
+                  <span className="text-xs">{post.likes ?? 0}</span>
+                </span>
+                <span className="flex items-center gap-0.5">
+                  <MessageCircle size={14} />
+                  <span className="text-xs">{post.comments ?? 0}</span>
+                </span>
+              </>
+            ) : (
+              <span className="flex items-center gap-0.5">
+                <MessageCircle size={14} />
+                <span className="text-xs">{post.comments ?? 0}</span>
+              </span>
+            )}
           </div>
         </div>
       </div>

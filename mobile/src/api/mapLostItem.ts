@@ -24,7 +24,7 @@ export function lostItemToSharedPost(item: LostItemDto, baseUrl?: string): Share
     content: content || "寻物启事",
     image,
     likes: 0,
-    comments: 0,
+    comments: item.commentCount ?? 0,
     tags: ["寻物启事"],
   };
 }

@@ -8,4 +8,6 @@ import java.util.List;
 public interface LostItemCommentRepository extends JpaRepository<LostItemComment, Long> {
 
     List<LostItemComment> findByLostItem_IdOrderByCreatedAtAsc(Long lostItemId);
+
+    long countByLostItem_Id(Long lostItemId);
 }
