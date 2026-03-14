@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Send, Sparkles, Loader2, Plus } from 'lucide-react';
 
 import { getApiBaseUrl } from '../../api/client';
-import { aiAssistantMenuContext, aiAssistantInitialMessage } from '../../mocks/aiAssistant';
+import { aiAssistantInitialMessage } from '../../mocks/aiAssistant';
 
 const SCREEN_CLIENT_ID = 'screen';
 
@@ -53,15 +54,8 @@ export function AIAssistant() {
       return;
     }
 
-    const systemPrompt = `你是一个大学食堂的AI助手，负责给学生推荐菜品、回答关于食堂的问题。请保持热情、友好、活泼的语气。
-
-以下是今日的菜单信息：
-${aiAssistantMenuContext}
-
-请根据以上信息给出回答。如果学生问的问题与食堂无关，请委婉地引导回食堂的话题。`;
-
+    // 对话由后端 Agent 处理（clientType=screen，可查 vendors 等），不再带前端假数据
     const apiMessages: { role: string; content: string }[] = [
-      { role: 'system', content: systemPrompt },
       ...messages.map(m => ({
         role: m.role === 'user' ? 'user' : 'assistant',
         content: m.text,
@@ -159,7 +153,13 @@ ${aiAssistantMenuContext}
                       ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-tr-sm shadow-[0_5px_15px_rgba(6,182,212,0.3)] keep-colors' 
                       : 'bg-white/10 text-slate-200 rounded-tl-sm border border-white/5'
                   }`}>
-                    {msg.text}
+                    {msg.role === 'ai' ? (
+                      <div className="ai-markdown [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_code]:bg-white/15 [&_code]:px-1.5 [&_code]:rounded [&_code]:text-xs [&_a]:text-cyan-400 [&_a]:underline hover:[&_a]:text-cyan-300 [&_strong]:font-semibold [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm">
+                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      msg.text
+                    )}
                   </div>
                 </div>
               ))}

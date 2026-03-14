@@ -239,6 +239,7 @@ TOOLS_FOR_FEEDBACK_ANALYZER = [TOOLS_BY_NAME[n] for n in FEEDBACK_ANALYZER_TOOL_
 
 
 # ========== Screen / Mobile 固定工具集（无 RBAC） ==========
+# screen 大屏允许查表 vendors，用于食堂/商家推荐
 
 TOOLS_FOR_SCREEN = [
     get_user_info,
@@ -247,6 +248,7 @@ TOOLS_FOR_SCREEN = [
     list_orders_by_user,
     list_orders_by_vendor,
     list_posts,
+    TOOLS_BY_NAME["query_vendors"],
 ]
 TOOLS_FOR_MOBILE = [
     get_user_info,
@@ -255,6 +257,11 @@ TOOLS_FOR_MOBILE = [
     list_orders_by_user,
     list_posts,
 ]
+
+# 大屏 AI 助手角色说明，会注入到 screen 请求的首条系统消息
+SCREEN_SYSTEM_PROMPT = """你是食堂大屏的 AI 助手，负责给学生推荐食堂、商家并回答与食堂相关的问题。
+你可以使用 query_vendors 工具查询商家/供应商表（食堂窗口、档口等），根据查询结果推荐今日可去的食堂与档口。
+请保持热情、友好、简洁。若问题与食堂无关，可委婉引导回食堂话题。"""
 
 
 def get_tools_for_request(client_type: str, role: str | None) -> list:
@@ -433,8 +440,10 @@ def process_message(
             empty["content"] = "请说一句你想查的内容。"
         return empty
 
-    # 构建发给 Agent 的消息：可选小结 + 最近几轮
+    # 构建发给 Agent 的消息：screen 时注入角色说明；可选小结；最近几轮
     lc_messages = []
+    if client_type == CLIENT_SCREEN:
+        lc_messages.append(SystemMessage(content=SCREEN_SYSTEM_PROMPT))
     if context_summary and context_summary.strip():
         lc_messages.append(
             SystemMessage(content=f"【此前对话摘要】\n{context_summary.strip()}\n\n【以下为最近对话】")
