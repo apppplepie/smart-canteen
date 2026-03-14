@@ -6,4 +6,5 @@ export {
   apiPost,
   apiPut,
   apiDelete,
+  ApiError,
 } from "@scs/api";

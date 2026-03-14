@@ -294,25 +294,53 @@ export function useFeedback(): {
   const [error, setError] = useState<string | null>(null);
   const [isFromApi, setIsFromApi] = useState(false);
 
-  const fetchPosts = React.useCallback(() => {
+  const fetchPosts = React.useCallback((isPolling = false) => {
     if (!isApiConfigured()) return Promise.resolve();
-    setLoading(true);
-    setError(null);
+    if (!isPolling) {
+      setLoading(true);
+      setError(null);
+    }
     return apiGet<PostDto[]>('/api/posts?postType=feedback')
       .then((posts) => {
         if (posts.length > 0) {
-          setFeedbacks(posts.map((p, i) => postToFeedbackItem(p, i)));
+          const next = posts.map((p, i) => postToFeedbackItem(p, i));
+          setFeedbacks((prev) => {
+            if (prev.length !== next.length) return next;
+            const same = prev.every(
+              (p, i) => {
+                const n = next[i];
+                return (
+                  n &&
+                  p.id === n.id &&
+                  p.status === n.status &&
+                  (p.aiSuggestion ?? '') === (n.aiSuggestion ?? '') &&
+                  (p.reply ?? '') === (n.reply ?? '') &&
+                  p.content === n.content &&
+                  p.time === n.time
+                );
+              }
+            );
+            return same ? prev : next;
+          });
           setIsFromApi(true);
         }
       })
       .catch((e) => {
-        setError(e instanceof Error ? e.message : '请求失败');
+        if (!isPolling) setError(e instanceof Error ? e.message : '请求失败');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isPolling) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
-    fetchPosts();
+    fetchPosts(false);
+  }, [fetchPosts]);
+
+  useEffect(() => {
+    if (!isApiConfigured()) return;
+    const t = setInterval(() => fetchPosts(true), 30000);
+    return () => clearInterval(t);
   }, [fetchPosts]);
 
   return {

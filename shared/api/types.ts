@@ -113,6 +113,8 @@ export interface OrderDto {
   queueNumber?: string;
   placedAt?: string;
   updatedAt?: string;
+  /** 用户对该订单完成商家评分的时间，有值表示已评价 */
+  reviewedAt?: string | null;
 }
 
 export interface OrderItemDto {

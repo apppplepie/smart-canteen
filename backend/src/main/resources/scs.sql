@@ -177,6 +177,7 @@ CREATE TABLE `orders`  (
   `queue_number` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `placed_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `reviewed_at` datetime NULL DEFAULT NULL COMMENT '用户对该订单完成商家评分的时间',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_orders_user`(`user_id` ASC) USING BTREE,
   INDEX `idx_orders_vendor`(`vendor_id` ASC) USING BTREE,

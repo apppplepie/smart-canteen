@@ -35,6 +35,7 @@ public class V1DataController {
     private final StockMovementRepository stockMovementRepo;
     private final TestReportRepository testReportRepo;
     private final MaterialRepository materialRepo;
+    private final MenuItemMaterialRepository menuItemMaterialRepo;
     private final AiConversationRepository aiConversationRepo;
     private final AiMessageRepository aiMessageRepo;
 
@@ -50,6 +51,7 @@ public class V1DataController {
                             RetainedSampleRepository retainedSampleRepo, SensorLogRepository sensorLogRepo,
                             StockMovementRepository stockMovementRepo, TestReportRepository testReportRepo,
                             MaterialRepository materialRepo,
+                            MenuItemMaterialRepository menuItemMaterialRepo,
                             AiConversationRepository aiConversationRepo, AiMessageRepository aiMessageRepo) {
         this.objectMapper = objectMapper;
         this.userRepo = userRepo;
@@ -68,6 +70,7 @@ public class V1DataController {
         this.stockMovementRepo = stockMovementRepo;
         this.testReportRepo = testReportRepo;
         this.materialRepo = materialRepo;
+        this.menuItemMaterialRepo = menuItemMaterialRepo;
         this.aiConversationRepo = aiConversationRepo;
         this.aiMessageRepo = aiMessageRepo;
     }
@@ -89,6 +92,7 @@ public class V1DataController {
         put("sensor_logs", sensorLogRepo, SensorLog.class);
         put("stock_movements", stockMovementRepo, StockMovement.class);
         put("test_reports", testReportRepo, TestReport.class);
+        put("materials", materialRepo, Material.class);
         put("ai_conversations", aiConversationRepo, AiConversation.class);
         put("ai_messages", aiMessageRepo, AiMessage.class);
     }
@@ -103,7 +107,9 @@ public class V1DataController {
             @PathVariable String table,
             @RequestParam(defaultValue = "1") int currentPage,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long menuItemId,
+            @RequestParam(required = false) Long materialId) {
         int pageIndex = Math.max(0, currentPage - 1);
         int pageSize = Math.min(100, size);
         var pageRequest = PageRequest.of(pageIndex, pageSize);
@@ -112,6 +118,22 @@ public class V1DataController {
                     ? userRepo.findByIsDeletedFalseAndUsernameContainingOrPhoneContaining(keyword.trim(), keyword.trim(), pageRequest)
                     : userRepo.findByIsDeletedFalse(pageRequest);
             return ApiResult.ok(Map.<String, Object>of("list", page.getContent(), "total", page.getTotalElements()));
+        }
+        if ("menu_item_materials".equals(table)) {
+            List<?> list;
+            long total;
+            if (menuItemId != null) {
+                list = menuItemMaterialRepo.findByMenuItemId(menuItemId);
+                total = list.size();
+            } else if (materialId != null) {
+                list = menuItemMaterialRepo.findByMaterialId(materialId);
+                total = list.size();
+            } else {
+                var page = menuItemMaterialRepo.findAll(pageRequest);
+                list = page.getContent();
+                total = page.getTotalElements();
+            }
+            return ApiResult.ok(Map.<String, Object>of("list", list, "total", total));
         }
         JpaRepository<?, Long> repo = repoMap.get(table);
         if (repo == null) return ApiResult.fail(404, "表不存在: " + table);
@@ -198,6 +220,9 @@ public class V1DataController {
                 a.setUpdatedAt(e.getUpdatedAt());
             } else if (entity instanceof AiMessage a && existing instanceof AiMessage e) {
                 a.setCreatedAt(e.getCreatedAt());
+            } else if (entity instanceof Material m && existing instanceof Material e) {
+                m.setCreatedAt(e.getCreatedAt());
+                m.setUpdatedAt(e.getUpdatedAt());
             }
         } catch (Exception ignored) {}
     }
@@ -226,6 +251,8 @@ public class V1DataController {
             if (e.getVendorId() != null) vendorRepo.findById(e.getVendorId()).ifPresent(e::setVendor);
             if (e.getUserId() != null) userRepo.findById(e.getUserId()).ifPresent(e::setUser);
         } else if (entity instanceof RetainedSample e) {
+            if (e.getVendorId() != null) vendorRepo.findById(e.getVendorId()).ifPresent(e::setVendor);
+        } else if (entity instanceof Material e) {
             if (e.getVendorId() != null) vendorRepo.findById(e.getVendorId()).ifPresent(e::setVendor);
         } else if (entity instanceof StockMovement e) {
             if (e.getVendorId() != null) vendorRepo.findById(e.getVendorId()).ifPresent(e::setVendor);

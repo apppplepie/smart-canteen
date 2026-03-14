@@ -18,6 +18,8 @@ type OrderRow = {
   items: string;
   vendorId?: number;
   totalAmount: number;
+  /** 已评价则不可再选为评价订单 */
+  reviewedAt?: string | null;
 };
 
 export function HistoryOrdersPage({
@@ -27,7 +29,7 @@ export function HistoryOrdersPage({
 }: {
   onBack: () => void;
   userId?: number;
-  onSelectOrder?: (order: { vendorId?: number; totalAmount: number; vendorName?: string; image?: string }) => void;
+  onSelectOrder?: (order: { orderId?: number; vendorId?: number; totalAmount: number; vendorName?: string; image?: string }) => void;
 }) {
   const [orders, setOrders] = useState<OrderRow[]>(historyOrdersFallbackMock);
   const [loading, setLoading] = useState(!!getBaseUrl());
@@ -85,6 +87,7 @@ export function HistoryOrdersPage({
             items: `¥${o.totalAmount}`,
             vendorId: o.vendorId,
             totalAmount: Number(o.totalAmount),
+            reviewedAt: o.reviewedAt ?? null,
           }));
         setOrders(rows.length ? rows : historyOrdersFallbackMock);
       } catch {
@@ -170,19 +173,26 @@ export function HistoryOrdersPage({
 
                   <div className="mt-4 pt-4 border-t border-gray-50 flex justify-end gap-3">
                     {onSelectOrder && (
-                      <button
-                        onClick={() =>
-                          onSelectOrder({
-                            vendorId: order.vendorId,
-                            totalAmount: order.totalAmount,
-                            vendorName: order.name,
-                            image: order.image,
-                          })
-                        }
-                        className="px-4 py-1.5 rounded-full border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                      >
-                        选为评价订单
-                      </button>
+                      order.reviewedAt ? (
+                        <span className="px-4 py-1.5 rounded-full border border-gray-100 text-sm font-medium text-gray-400 bg-gray-50">
+                          已评价
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            onSelectOrder({
+                              orderId: order.id,
+                              vendorId: order.vendorId,
+                              totalAmount: order.totalAmount,
+                              vendorName: order.name,
+                              image: order.image,
+                            })
+                          }
+                          className="px-4 py-1.5 rounded-full border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                          选为评价订单
+                        </button>
+                      )
                     )}
                     <button
                       className="px-4 py-1.5 rounded-full text-sm font-medium text-white transition-colors shadow-sm"

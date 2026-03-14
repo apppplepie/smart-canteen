@@ -224,9 +224,9 @@ export default function LostFound() {
                 <Search className="text-rose-400 w-5 h-5" />
                 寻物启事
               </h2>
-              <button className="px-4 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-full text-xs font-bold transition-colors">
+              {/* <button className="px-4 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-full text-xs font-bold transition-colors">
                 发布寻物
-              </button>
+              </button> */}
             </div>
             <ScrollingLostItems items={lostItems} />
           </div>
@@ -238,9 +238,9 @@ export default function LostFound() {
                 <CheckCircle2 className="text-cyan-400 w-5 h-5" />
                 失物招领
               </h2>
-              <button className="px-4 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-full text-xs font-bold transition-colors">
+              {/* <button className="px-4 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-full text-xs font-bold transition-colors">
                 发布招领
-              </button>
+              </button> */}
             </div>
             <div className="flex-1 min-h-0">
               <FoundCarousel items={foundItems} />

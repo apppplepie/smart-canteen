@@ -3,6 +3,8 @@ package com.scs.controller;
 import com.scs.entity.Post;
 import com.scs.entity.VendorReview;
 import com.scs.repository.OrderRepository;
+
+import java.time.LocalDateTime;
 import com.scs.repository.PostRepository;
 import com.scs.repository.UserRepository;
 import com.scs.repository.VendorRepository;
@@ -71,6 +73,10 @@ public class VendorReviewController {
 
         try {
             VendorReview saved = repo.save(entity);
+            orderRepo.findById(entity.getOrderId()).ifPresent(o -> {
+                o.setReviewedAt(LocalDateTime.now());
+                orderRepo.save(o);
+            });
 
             // 有评论时同步到食堂圈，并关联本条评价（用于详情页展示打分）
             if (entity.getContent() != null && !entity.getContent().isBlank()) {

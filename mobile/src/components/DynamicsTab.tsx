@@ -20,13 +20,14 @@ import { lostItemToSharedPost } from "../api/mapLostItem";
 import { listOrdersByUser } from "../api/orders";
 import { listOrderItemsByOrder } from "../api/orderItems";
 import { getMenuItem } from "../api/menuItems";
-import { getBaseUrl } from "../api/client";
+import { getBaseUrl, ApiError } from "../api/client";
 import { postToSharedPost } from "../api/mapPost";
 import type { SharedPost } from "./SharedPostDetail";
 import { dynamicsPostsFallbackMock, type DynamicsPost } from "../mocks/dynamicsPosts";
 
-/** 从历史订单解析出的最近一单菜品，用于快速发布卡片 */
+/** 从历史订单解析出的最近一单菜品，用于快速发布卡片（仅未评价订单） */
 type HistoryDishItem = {
+  orderId: number;
   vendorName: string;
   dishName?: string;
   image: string;
@@ -44,6 +45,7 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
   const [submittingRating, setSubmittingRating] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
   const [historyDish, setHistoryDish] = useState<HistoryDishItem | null>(null);
 
   const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -108,8 +110,12 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
         const s = (o.status ?? "").toLowerCase();
         return s === "completed" || s === "已完成" || s === "done";
       });
-      const last = completed[0];
-      if (!last) return;
+      const unreviewed = completed.find((o) => !o.reviewedAt);
+      const last = unreviewed ?? null;
+      if (!last) {
+        setHistoryDish(null);
+        return;
+      }
       const vendors = await listVendors();
       const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
       const vendorName = vendorMap.get(last.vendorId ?? 0) ?? "订单";
@@ -117,6 +123,7 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
       const firstItem = orderItems[0];
       if (!firstItem?.menuItemId) {
         setHistoryDish({
+          orderId: last.id,
           vendorName,
           image: `https://picsum.photos/seed/v${last.vendorId ?? last.id}/100/100`,
           vendorId: last.vendorId,
@@ -132,6 +139,7 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
             ? `${apiBase.replace(/\/$/, "")}${menuItem.imageUrl.startsWith("/") ? "" : "/"}${menuItem.imageUrl}`
             : `https://picsum.photos/seed/m${firstItem.menuItemId}/100/100`;
       setHistoryDish({
+        orderId: last.id,
         vendorName,
         dishName: menuItem?.name,
         image: img,
@@ -175,26 +183,14 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
             className={`w-full object-cover ${(post as { height?: string }).height ?? "h-48"}`}
             referrerPolicy="no-referrer"
           />
-          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
-            {hasRating && (
+          {hasRating && (
+            <div className="absolute bottom-2 left-2 flex items-center gap-2">
               <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-xs font-medium">
                 <Star size={12} className="text-amber-400 fill-amber-400" />
                 {post.rating}
               </span>
-            )}
-            <div className="flex items-center gap-2 ml-auto">
-              {!isLost && (
-                <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-xs">
-                  <Heart size={12} />
-                  {post.likes ?? 0}
-                </span>
-              )}
-              <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-xs">
-                <MessageCircle size={12} />
-                {post.comments ?? 0}
-              </span>
             </div>
-          </div>
+          )}
         </div>
       )}
       {!post.image && (
@@ -316,6 +312,7 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
                     items: historyDish.dishName ?? (historyDish.totalAmount != null ? `¥${historyDish.totalAmount}` : ""),
                     image: historyDish.image,
                     vendorId: historyDish.vendorId,
+                    orderId: historyDish.orderId,
                   }
                 : undefined
             }
@@ -364,72 +361,106 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
       </div>
 
       <div className="max-w-7xl mx-auto w-full px-6 -mt-12 md:-mt-16 relative z-10 space-y-6 md:space-y-8">
-        {/* Quick Publish Card - 来自历史订单的最近一单 */}
+        {/* 有未评价订单时：展示最近一单的快速打分卡片 + 长评入口；全部已评时：只展示长评入口 */}
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <img
-                src={historyDish?.image ?? "https://picsum.photos/seed/m2/100/100"}
-                className="w-12 h-12 rounded-xl object-cover"
-                referrerPolicy="no-referrer"
-                alt=""
-              />
-              <div>
-                <h3 className="font-bold text-gray-900 text-sm">
-                  {historyDish?.vendorName ?? "—"}
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {historyDish?.dishName ?? (historyDish ? `¥${historyDish.totalAmount ?? ""}` : "从历史订单选择要点评的菜品")}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    size={20}
-                    onClick={() => setRating(star)}
-                    className={cn(
-                      "cursor-pointer transition-colors",
-                      rating >= star ? "text-amber-400 fill-amber-400" : "text-gray-200"
-                    )}
+          {historyDish ? (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={historyDish.image}
+                    className="w-12 h-12 rounded-xl object-cover"
+                    referrerPolicy="no-referrer"
+                    alt=""
                   />
-                ))}
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-sm">{historyDish.vendorName}</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {historyDish.dishName ?? `¥${historyDish.totalAmount ?? ""}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        size={20}
+                        onClick={() => setRating(star)}
+                        className={cn(
+                          "cursor-pointer transition-colors",
+                          rating >= star ? "text-amber-400 fill-amber-400" : "text-gray-200"
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    disabled={rating === 0 || !historyDish.vendorId || user?.userId == null || submittingRating}
+                    onClick={async () => {
+                      if (rating < 1 || !historyDish?.vendorId || user?.userId == null) return;
+                      const base = getBaseUrl();
+                      if (!base) {
+                        setRatingError("未配置后端地址，无法提交评分");
+                        return;
+                      }
+                      setRatingError(null);
+                      setSubmittingRating(true);
+                      try {
+                        await createVendorReview({
+                          userId: user.userId!,
+                          vendorId: historyDish.vendorId,
+                          orderId: historyDish.orderId,
+                          rating,
+                        });
+                        setRating(0);
+                        fetchHistoryDish();
+                      } catch (e: unknown) {
+                        const status = e instanceof ApiError ? e.status : 0;
+                        const msg =
+                          status === 400
+                            ? "请求参数有误，请检查订单与商家是否匹配"
+                            : status === 403
+                              ? "只能对自己的订单进行评分"
+                              : status === 404
+                                ? "未找到对应订单，无法评分"
+                                : status === 409
+                                  ? "该订单已评价过，无法重复评分"
+                                  : status >= 500
+                                    ? "服务暂时繁忙，请稍后重试"
+                                    : "发布评分失败，请稍后重试";
+                        setRatingError(msg);
+                        setTimeout(() => setRatingError(null), 5000);
+                      } finally {
+                        setSubmittingRating(false);
+                      }
+                    }}
+                    className="px-4 py-1.5 bg-[#FF6B6B] text-white text-xs font-bold rounded-full shadow-sm disabled:opacity-50 transition-colors flex items-center gap-1"
+                  >
+                    {submittingRating ? <Loader2 size={14} className="animate-spin" /> : null}
+                    发布评分
+                  </button>
+                </div>
+                {ratingError && (
+                  <p className="mt-2 w-full text-left text-xs text-red-600 font-medium" role="alert">
+                    {ratingError}
+                  </p>
+                )}
               </div>
-              <button
-                disabled={rating === 0 || !historyDish?.vendorId || user?.userId == null || submittingRating}
-                onClick={async () => {
-                  if (rating < 1 || !historyDish?.vendorId || user?.userId == null) return;
-                  const base = getBaseUrl();
-                  if (!base) { alert("未配置后端地址"); return; }
-                  setSubmittingRating(true);
-                  try {
-                    await createVendorReview({
-                      userId: user.userId!,
-                      vendorId: historyDish.vendorId,
-                      rating,
-                    });
-                    fetchHistoryDish();
-                  } catch (e) {
-                    alert("发布评分失败: " + (e instanceof Error ? e.message : String(e)));
-                  } finally {
-                    setSubmittingRating(false);
-                  }
-                }}
-                className="px-4 py-1.5 bg-[#FF6B6B] text-white text-xs font-bold rounded-full shadow-sm disabled:opacity-50 transition-colors flex items-center gap-1"
+              <div
+                onClick={() => setIsPublishing(true)}
+                className="bg-gray-50 rounded-2xl px-4 py-3 text-sm text-gray-400 cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
               >
-                {submittingRating ? <Loader2 size={14} className="animate-spin" /> : null}
-                发布评分
-              </button>
+                写下你的长评，分享美食体验...
+              </div>
+            </>
+          ) : (
+            <div
+              onClick={() => setIsPublishing(true)}
+              className="bg-gray-50 rounded-2xl px-4 py-4 text-sm text-gray-400 cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+            >
+              写下你的长评，分享美食体验...
             </div>
-          </div>
-          <div
-            onClick={() => setIsPublishing(true)}
-            className="bg-gray-50 rounded-2xl px-4 py-3 text-sm text-gray-400 cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
-          >
-            写下你的长评，分享美食体验...
-          </div>
+          )}
         </div>
 
         {/* Waterfall Layout */}

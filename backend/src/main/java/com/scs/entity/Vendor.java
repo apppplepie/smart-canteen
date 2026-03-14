@@ -38,7 +38,7 @@ public class Vendor {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @Column(name = "rating_avg", precision = 3, scale = 2)
+    @Column(name = "rating_avg")
     private Double ratingAvg;
 
     @Column(name = "rating_count")

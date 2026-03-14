@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PageContainer } from '../components/common/PageContainer';
 import { motion } from 'motion/react';
 import { MessageSquare, Send, BarChart3, PieChart as PieChartIcon, CheckCircle2, Clock, TrendingUp, Users, Sparkles } from 'lucide-react';
@@ -119,23 +119,6 @@ export default function Feedback() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const feedbackListRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = feedbackListRef.current;
-    if (!el || latestFeedbacks.length <= 1) return;
-    const step = 1;
-    const interval = 50;
-    const timer = setInterval(() => {
-      const { scrollTop, scrollHeight, clientHeight } = el;
-      if (scrollTop + clientHeight >= scrollHeight - 4) {
-        el.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        el.scrollBy({ top: step, behavior: 'auto' });
-      }
-    }, interval);
-    return () => clearInterval(timer);
-  }, [latestFeedbacks.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,7 +155,7 @@ export default function Feedback() {
 
   return (
     <PageContainer>
-      <div className="bg-slate-950 rounded-[2rem] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.2)] relative min-h-[calc(100vh-8rem)] p-6 md:p-8">
+      <div className="bg-slate-950 rounded-[2rem] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.2)] relative min-h-[calc(100vh-8rem)] p-6 md:p-8 flex flex-col">
         
         {/* Ambient Background */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
@@ -182,7 +165,7 @@ export default function Feedback() {
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative z-10 mb-8 flex items-center gap-4"
+          className="relative z-10 mb-8 flex items-center gap-4 shrink-0"
         >
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.4)]">
             <MessageSquare className="text-white w-6 h-6" />
@@ -197,21 +180,17 @@ export default function Feedback() {
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 relative z-10">
           
-          {/* Left Column: Latest Feedback (Takes more space on large screens) */}
-          <div className="xl:col-span-7 space-y-6 flex flex-col">
-            <div className="flex items-center justify-between mb-2 flex-shrink-0">
+          {/* Left Column: 限定高度，容器内手动滚动，不影响右侧 */}
+          <div className="xl:col-span-7 flex flex-col h-[min(85vh,920px)]">
+            <div className="flex items-center justify-between mb-4 shrink-0">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Users className="text-purple-400 w-5 h-5" />
                 最新留言墙
               </h2>
-              <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-slate-400 font-medium">
-                实时更新
-              </div>
             </div>
 
             <div
-              ref={feedbackListRef}
-              className="space-y-4 h-[min(90vh,1000px)] overflow-y-auto pr-2 flex-shrink-0 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex-1 min-h-0 overflow-y-auto space-y-4 pl-10 pr-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {loading && <div className="text-slate-400 text-sm">加载中...</div>}
               {latestFeedbacks.map((item, idx) => (

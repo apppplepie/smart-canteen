@@ -11,6 +11,7 @@ export {
   apiPost,
   apiPut,
   apiDelete,
+  ApiError,
 } from "./client";
 
 export type {

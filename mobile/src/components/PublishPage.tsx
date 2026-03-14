@@ -17,7 +17,7 @@ export function PublishPage({
   onSuccess?: () => void;
   currentUserId?: number;
   /** 从食堂圈快速发布卡片传入的历史订单，用于预填选单 */
-  initialOrder?: { name: string; items: string; image: string; vendorId?: number };
+  initialOrder?: { name: string; items: string; image: string; vendorId?: number; orderId?: number };
   key?: string;
 }) {
   const [content, setContent] = useState("");
@@ -26,7 +26,7 @@ export function PublishPage({
   const [submitting, setSubmitting] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<{ name: string; items: string; image: string; orderId?: number; vendorId?: number }>(() => ({
     ...publishPageDefaultOrderMock,
-    ...(initialOrder ? { name: initialOrder.name, items: initialOrder.items, image: initialOrder.image, vendorId: initialOrder.vendorId } : {}),
+    ...(initialOrder ? { name: initialOrder.name, items: initialOrder.items, image: initialOrder.image, vendorId: initialOrder.vendorId, orderId: initialOrder.orderId } : {}),
   }));
 
   const canPublish = !!(
@@ -85,6 +85,7 @@ export function PublishPage({
                   items: "¥" + order.totalAmount,
                   image: order.image ?? "https://picsum.photos/seed/m2/100/100",
                   vendorId: order.vendorId,
+                  orderId: order.orderId,
                 });
                 setShowHistory(false);
               }}

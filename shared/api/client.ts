@@ -22,6 +22,17 @@ function ensureBase(): string {
   return base;
 }
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public body?: string,
+  ) {
+    super(message || `HTTP ${status}`);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const base = ensureBase();
   const p = path.startsWith("/") ? path : `/${path}`;
@@ -29,7 +40,10 @@ export async function apiGet<T>(path: string): Promise<T> {
     method: "GET",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
   });
-  if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
+  if (!res.ok) {
+    const body = await res.text().catch(() => res.statusText);
+    throw new ApiError(body || res.statusText, res.status, body);
+  }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -42,7 +56,10 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
+  if (!res.ok) {
+    const body = await res.text().catch(() => res.statusText);
+    throw new ApiError(body || res.statusText, res.status, body);
+  }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -55,7 +72,10 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
+  if (!res.ok) {
+    const body = await res.text().catch(() => res.statusText);
+    throw new ApiError(body || res.statusText, res.status, body);
+  }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -64,5 +84,8 @@ export async function apiDelete(path: string): Promise<void> {
   const base = ensureBase();
   const p = path.startsWith("/") ? path : `/${path}`;
   const res = await fetch(`${base}${p}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) throw new Error(await res.text().catch(() => res.statusText));
+  if (!res.ok && res.status !== 204) {
+    const body = await res.text().catch(() => res.statusText);
+    throw new ApiError(body || res.statusText, res.status, body);
+  }
 }

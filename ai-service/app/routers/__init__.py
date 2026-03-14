@@ -43,6 +43,16 @@ class SummarizeResponse(BaseModel):
     summary: str
 
 
+class FeedbackAnalyzeBody(BaseModel):
+    postId: int
+    content: str = ""
+    feedbackType: str = "other"
+
+
+class FeedbackAnalyzeResponse(BaseModel):
+    ai_suggestion: str
+
+
 api_router = APIRouter()
 
 
@@ -67,8 +77,8 @@ def _last_user_content(messages: list[dict]) -> str:
     return ""
 
 
-@api_router.post("/chat", response_model=ChatResponse)
-async def chat(request: Request) -> ChatResponse:
+async def _chat_handler(request: Request) -> ChatResponse:
+    logging.info("[chat] 1/3 收到 POST /api/chat")
     if not DEEPSEEK_API_KEY:
         raise HTTPException(status_code=503, detail="DEEPSEEK_API_KEY not configured")
     raw_bytes = await request.body()
@@ -99,6 +109,7 @@ async def chat(request: Request) -> ChatResponse:
     if client_type not in ("admin", "screen", "mobile"):
         client_type = "mobile"
     role = req.get("role")
+    logging.info("[chat] 2/3 调用 process_message clientType=%s messagesLen=%s", client_type, len(messages))
 
     from app.ai_agent import process_message
     result = await asyncio.to_thread(process_message, messages, context_summary, client_type, role)
@@ -109,8 +120,19 @@ async def chat(request: Request) -> ChatResponse:
     suggestions = result.get("suggestions")
 
     print("[Agent 回复]", content[:300] + ("..." if len(content) > 300 else ""), flush=True)
-    logging.info("[Agent 回复] %s", content if len(content) <= 500 else content[:500] + "...")
+    logging.info("[chat] 3/3 返回 contentLen=%s", len(content))
     return ChatResponse(content=content, tool_calls=tool_calls, suggestions=suggestions)
+
+
+# 同时注册 /chat 和 /chat/，避免因尾斜杠导致 404
+@api_router.post("/chat", response_model=ChatResponse)
+async def chat(request: Request) -> ChatResponse:
+    return await _chat_handler(request)
+
+
+@api_router.post("/chat/", response_model=ChatResponse)
+async def chat_trailing_slash(request: Request) -> ChatResponse:
+    return await _chat_handler(request)
 
 
 @api_router.post("/chat/summarize", response_model=SummarizeResponse)
@@ -165,3 +187,21 @@ async def suggest_title(body: SuggestTitleBody) -> SuggestTitleResponse:
     except Exception as e:
         logging.warning("suggest-title failed: %s", e)
         return SuggestTitleResponse(title=msg[:TITLE_MAX_LEN] if msg else "新对话")
+
+
+@api_router.post("/feedback/analyze", response_model=FeedbackAnalyzeResponse)
+async def feedback_analyze(body: FeedbackAnalyzeBody) -> FeedbackAnalyzeResponse:
+    """后台任务：对一条反馈做 AI 分析并写回 posts 表 ai_suggestion（方案 B，由 Agent 调 Spring Boot PATCH）。"""
+    logging.info("[feedback/analyze] 1/3 收到请求 postId=%s, contentLen=%s, feedbackType=%s", body.postId, len(body.content or ""), body.feedbackType)
+    if not DEEPSEEK_API_KEY:
+        raise HTTPException(status_code=503, detail="DEEPSEEK_API_KEY not configured")
+    from app.ai_agent import run_feedback_analyzer
+    logging.info("[feedback/analyze] 2/3 开始 run_feedback_analyzer ...")
+    suggestion = await asyncio.to_thread(
+        run_feedback_analyzer,
+        body.postId,
+        body.content or "",
+        body.feedbackType or "other",
+    )
+    logging.info("[feedback/analyze] 3/3 完成 suggestionLen=%s", len(suggestion or ""))
+    return FeedbackAnalyzeResponse(ai_suggestion=suggestion or "")

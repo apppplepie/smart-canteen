@@ -54,7 +54,9 @@ public class AiChatController {
             AiConversationRepository conversationRepo,
             AiMessageRepository messageRepo,
             UserRepository userRepo) {
-        this.aiServiceBaseUrl = aiServiceBaseUrl;
+        this.aiServiceBaseUrl = (aiServiceBaseUrl != null && !aiServiceBaseUrl.isBlank())
+                ? aiServiceBaseUrl.trim().replaceAll("/$", "") : "http://localhost:8000";
+        log.info("[AI] 使用 ai.service.base-url={}", this.aiServiceBaseUrl);
         this.objectMapper = objectMapper;
         this.conversationRepo = conversationRepo;
         this.messageRepo = messageRepo;
@@ -269,8 +271,11 @@ public class AiChatController {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<byte[]> entity = new HttpEntity<>(jsonBody.getBytes(StandardCharsets.UTF_8), headers);
+            String chatUrl = aiServiceBaseUrl + "/api/chat";
+            log.info("[AI chat] 步骤 1/2 即将请求 FastAPI url={}, bodySize={}", chatUrl, jsonBody.length());
             RestTemplate restTemplate = new RestTemplate();
-            String responseBody = restTemplate.postForObject(aiServiceBaseUrl + "/api/chat", entity, String.class);
+            String responseBody = restTemplate.postForObject(chatUrl, entity, String.class);
+            log.info("[AI chat] 步骤 2/2 FastAPI 返回 responseLength={}", responseBody != null ? responseBody.length() : 0);
 
             @SuppressWarnings("unchecked")
             Map<String, Object> response = responseBody != null ? objectMapper.readValue(responseBody, Map.class) : null;
@@ -318,12 +323,12 @@ public class AiChatController {
             String errorBody = e.getResponseBodyAsString();
             String message = parseFastApiDetail(errorBody);
             if (message == null) message = "AI 服务返回 " + status + ": " + (e.getMessage() != null ? e.getMessage() : errorBody);
-            log.warn("[AI chat] FastAPI 错误 status={}, body={}, message={}", status, errorBody, message);
+            log.warn("[AI chat] FastAPI 错误 url={}, status={}, body={}, message={}", aiServiceBaseUrl + "/api/chat", status, errorBody, message);
             saveErrorMessage(conversation, nextOrder + 1, message);
             return ApiResult.fail(status >= 400 && status < 600 ? status : 502, message);
         } catch (Exception e) {
             String message = "AI 服务不可用: " + e.getMessage();
-            log.warn("[AI chat] 转发失败: {}", e.getMessage());
+            log.warn("[AI chat] 连接失败 url={}, 错误: {} ({})", aiServiceBaseUrl + "/api/chat", e.getMessage(), e.getClass().getSimpleName());
             saveErrorMessage(conversation, nextOrder + 1, message);
             return ApiResult.fail(502, message);
         }
