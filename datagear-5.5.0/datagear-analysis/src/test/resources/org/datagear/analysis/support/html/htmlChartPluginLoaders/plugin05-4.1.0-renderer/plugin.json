@@ -1,5 +1,0 @@
-{
-	id : "plugin05",
-	nameLabel : "plugin05",
-	renderer : { render: function(chart){ } }
-}
