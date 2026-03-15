@@ -29,6 +29,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { LoginPage } from "./LoginPage";
+import { clearStoredToken } from "../api/auth";
 import { HistoryOrdersPage } from "./HistoryOrdersPage";
 import { MyPostsPage } from "./MyPostsPage";
 import { profileChartDataMock } from "../mocks/profileChart";
@@ -157,6 +158,7 @@ export function ProfileTab({
 
   const handleLogout = () => {
     if (window.confirm("确定要退出登录吗？")) {
+      clearStoredToken();
       onLogin?.(null);
     }
   };

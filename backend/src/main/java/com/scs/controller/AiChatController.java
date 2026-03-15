@@ -261,6 +261,9 @@ public class AiChatController {
                     : historyMaps.subList(historyMaps.size() - RECENT_MESSAGE_COUNT, historyMaps.size());
 
             Map<String, Object> forwardBody = new java.util.HashMap<>(Map.of("messages", messagesToSend, "clientType", clientType));
+            if (userId != null) {
+                forwardBody.put("userId", userId);
+            }
             if (role != null && !role.isBlank()) {
                 forwardBody.put("role", role);
             }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Home, Compass, User as UserIcon, Sparkles, Store } from "lucide-react";
 import { OrderingTab } from "./components/OrderingTab";
 import { DynamicsTab } from "./components/DynamicsTab";
@@ -6,11 +6,34 @@ import { ProfileTab } from "./components/ProfileTab";
 import { AIAssistantTab } from "./components/AIAssistantTab";
 import { CanteenOnlineTab } from "./components/CanteenOnlineTab";
 import { cn } from "./lib/utils";
+import { THEME } from "./config/theme";
 import { AnimatePresence, motion } from "motion/react";
+import { getStoredToken, getCurrentUser, clearStoredToken, isApiConfigured } from "./api/auth";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("ordering");
   const [user, setUser] = useState<import("./components/ProfileTab").ProfileUser>(null);
+
+  // 刷新页面时用本地 token 恢复登录（仅后端已配置时）
+  useEffect(() => {
+    if (!isApiConfigured()) return;
+    const token = getStoredToken();
+    if (!token) return;
+    getCurrentUser(token)
+      .then((me) => {
+        setUser({
+          name: me.username,
+          id: me.username,
+          avatar: "https://picsum.photos/seed/u" + (me.id ?? me.username) + "/100/100",
+          userId: me.id,
+          token,
+        });
+      })
+      .catch(() => {
+        // token 失效则清除，保持未登录
+        clearStoredToken();
+      });
+  }, []);
 
   const tabs = [
     { id: "ordering", label: "点餐", icon: Home },
@@ -84,7 +107,22 @@ export default function App() {
           >
             {activeTab === "ordering" && <OrderingTab user={user} />}
             {activeTab === "dynamics" && <DynamicsTab user={user} />}
-            {activeTab === "assistant" && <AIAssistantTab user={user ?? undefined} />}
+            {activeTab === "assistant" && !user && (
+              <div className="h-full flex flex-col items-center justify-center gap-6 px-8 bg-gray-50">
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg" style={{ backgroundColor: THEME.colors.primary }}>
+                  <Sparkles className="text-white" size={40} />
+                </div>
+                <p className="text-gray-600 text-center text-lg">请先登录后使用 AI 助手</p>
+                <button
+                  onClick={() => setActiveTab("profile")}
+                  className="px-8 py-3 rounded-2xl text-white font-bold shadow-md hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: THEME.colors.primary }}
+                >
+                  去登录
+                </button>
+              </div>
+            )}
+            {activeTab === "assistant" && user && <AIAssistantTab user={user ?? undefined} />}
             {activeTab === "online" && <CanteenOnlineTab user={user} />}
             {activeTab === "profile" && <ProfileTab user={user} onLogin={setUser} onNavigate={setActiveTab} />}
           </motion.div>

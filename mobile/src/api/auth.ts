@@ -1,8 +1,35 @@
 /**
  * 登录与当前用户接口，对接后端 users 表（学生/老师共用 auth/login、users/me）
+ * 演示用：token 直接存 localStorage，不加密。
  */
 
 import { getBaseUrl, isApiConfigured } from "./client";
+
+const TOKEN_KEY = "scs_mobile_token";
+
+export function getStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // ignore
+  }
+}
+
+export function clearStoredToken(): void {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 /** 后端统一响应格式 */
 interface ApiResponse<T> {
@@ -63,6 +90,7 @@ export async function login(params: LoginParams): Promise<LoginResult> {
   if (!body?.data?.token) {
     throw new Error("未返回 token");
   }
+  setStoredToken(body.data.token);
   return body.data;
 }
 

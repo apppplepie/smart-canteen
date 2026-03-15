@@ -19,14 +19,27 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { THEME } from "../config/theme";
 import { aiAssistantSuggestionsMock } from "../mocks/aiAssistant";
+import { MealRecommendationCard } from "./MealRecommendationCard";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+
+/** 低脂减脂餐卡片的展示数据（前端 mock，后续可接后端） */
+export interface MealRecommendationCardPayload {
+  merchantName: string;
+  dishName: string;
+  rating: number;
+  time: string;
+  image: string;
+}
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   suggestions?: string[];
+  /** 当为 mealRecommendation 时，在气泡内渲染 MealRecommendationCard，content 可作为说明文案 */
+  card?: "mealRecommendation";
+  cardPayload?: MealRecommendationCardPayload;
 }
 
 const WELCOME_MSG: Message = {
@@ -35,6 +48,17 @@ const WELCOME_MSG: Message = {
   content:
     "你好！我是你的食堂AI点餐助手 🤖\n\n不知道吃什么？时间太紧？或者想找点特定口味的菜品？随时问我！",
   suggestions: aiAssistantSuggestionsMock,
+};
+
+/** 点击此推荐语时，前端直接回复一张低脂减脂餐推荐卡片（不请求后端） */
+const MEAL_RECOMMENDATION_SUGGESTION = "推荐低脂减脂餐";
+
+const MOCK_MEAL_CARD: MealRecommendationCardPayload = {
+  merchantName: "健康轻食沙拉",
+  dishName: "鸡胸肉藜麦减脂餐",
+  rating: 4.8,
+  time: "约 8 分钟",
+  image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
 };
 
 function formatConversationTime(iso: string): string {
@@ -124,8 +148,21 @@ export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
-    setIsLoading(true);
 
+    // 前端逻辑：点击「推荐低脂减脂餐」时直接插入卡片消息，不请求后端
+    if (text.trim() === MEAL_RECOMMENDATION_SUGGESTION) {
+      const cardMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "为你推荐一款低脂减脂餐，轻卡饱腹～",
+        card: "mealRecommendation",
+        cardPayload: MOCK_MEAL_CARD,
+      };
+      setMessages((prev) => [...prev, cardMsg]);
+      return;
+    }
+
+    setIsLoading(true);
     try {
       if (!API_BASE_URL) {
         console.warn("VITE_API_BASE_URL 为空，请检查 .env 并重启前端 dev (npm run dev)");
@@ -325,21 +362,36 @@ export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
                   )}
                 >
                   {msg.role === "assistant" ? (
-                    <div className="markdown-body">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          p: ({ children }) => <p className="my-1.5 last:mb-0">{children}</p>,
-                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                          ul: ({ children }) => <ul className="my-1.5 list-disc pl-4 space-y-0.5">{children}</ul>,
-                          ol: ({ children }) => <ol className="my-1.5 list-decimal pl-4 space-y-0.5">{children}</ol>,
-                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                          code: ({ children }) => <code className="bg-gray-100 px-1 rounded text-xs">{children}</code>,
-                        }}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
-                    </div>
+                    msg.card === "mealRecommendation" && msg.cardPayload ? (
+                      <div className="space-y-3">
+                        {msg.content ? (
+                          <p className="text-gray-700 my-1.5">{msg.content}</p>
+                        ) : null}
+                        <MealRecommendationCard
+                          {...msg.cardPayload}
+                          onOrder={() => {
+                            // 前端占位，后续接下单接口
+                            console.log("点击下单", msg.cardPayload);
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="markdown-body">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => <p className="my-1.5 last:mb-0">{children}</p>,
+                            strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                            ul: ({ children }) => <ul className="my-1.5 list-disc pl-4 space-y-0.5">{children}</ul>,
+                            ol: ({ children }) => <ol className="my-1.5 list-decimal pl-4 space-y-0.5">{children}</ol>,
+                            li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                            code: ({ children }) => <code className="bg-gray-100 px-1 rounded text-xs">{children}</code>,
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    )
                   ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                   )}

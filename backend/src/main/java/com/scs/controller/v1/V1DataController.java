@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.PostConstruct;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -109,10 +111,25 @@ public class V1DataController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long menuItemId,
-            @RequestParam(required = false) Long materialId) {
+            @RequestParam(required = false) Long materialId,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Boolean todayOnly) {
         int pageIndex = Math.max(0, currentPage - 1);
         int pageSize = Math.min(100, size);
         var pageRequest = PageRequest.of(pageIndex, pageSize);
+        if ("orders".equals(table) && userId != null) {
+            var page = orderRepo.findByUser_IdOrderByPlacedAtDesc(userId, pageRequest);
+            return ApiResult.ok(Map.<String, Object>of("list", page.getContent(), "total", page.getTotalElements()));
+        }
+        if ("order_items".equals(table) && userId != null) {
+            var page = orderItemRepo.findByOrder_User_IdOrderByCreatedAtDesc(userId, pageRequest);
+            return ApiResult.ok(Map.<String, Object>of("list", page.getContent(), "total", page.getTotalElements()));
+        }
+        if ("queue_entries".equals(table) && Boolean.TRUE.equals(todayOnly)) {
+            LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+            var page = queueEntryRepo.findByCreatedAtAfter(startOfToday, pageRequest);
+            return ApiResult.ok(Map.<String, Object>of("list", page.getContent(), "total", page.getTotalElements()));
+        }
         if ("users".equals(table)) {
             var page = (keyword != null && !keyword.isBlank())
                     ? userRepo.findByIsDeletedFalseAndUsernameContainingOrPhoneContaining(keyword.trim(), keyword.trim(), pageRequest)

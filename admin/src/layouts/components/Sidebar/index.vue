@@ -49,7 +49,7 @@ const tipLineWidth = computed(() => !isTop.value ? "2px" : "0px")
 
 <template>
   <div :class="{ 'has-logo': isLogo }">
-    <Logo v-if="isLogo" :collapse="isCollapse" />
+    <!-- <Logo v-if="isLogo" :collapse="isCollapse" /> -->
     <el-scrollbar wrap-class="scrollbar-wrapper">
       <el-menu
         :default-active="activeMenu"

@@ -109,10 +109,11 @@ async def _chat_handler(request: Request) -> ChatResponse:
     if client_type not in ("admin", "screen", "mobile"):
         client_type = "mobile"
     role = req.get("role")
-    logging.info("[chat] 2/3 调用 process_message clientType=%s messagesLen=%s", client_type, len(messages))
+    user_id = req.get("userId")
+    logging.info("[chat] 2/3 调用 process_message clientType=%s messagesLen=%s userId=%s", client_type, len(messages), user_id)
 
     from app.ai_agent import process_message
-    result = await asyncio.to_thread(process_message, messages, context_summary, client_type, role)
+    result = await asyncio.to_thread(process_message, messages, context_summary, client_type, role, user_id)
     if isinstance(result, str):
         result = {"content": result, "tool_calls": None, "suggestions": None}
     content = (result.get("content") or "").strip() or "（无文本回复）"
