@@ -1,0 +1,15 @@
+# 仅三个前端，用 nginx 托管
+# 本地运行：docker compose -f docker-compose.frontend.yml up -d
+# 打包推服务器：见下方注释
+# 访问：http://localhost/（screen 入口）、http://localhost/admin、http://localhost/mobile
+
+services:
+  frontends:
+    image: ${DOCKERHUB_USER:-yourname}/scs-frontends:latest
+    build:
+      context: .
+      dockerfile: frontends/Dockerfile
+    container_name: scs-frontends
+    ports:
+      - "80:80"
+    restart: unless-stopped

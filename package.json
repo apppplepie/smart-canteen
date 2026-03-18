@@ -1,0 +1,13 @@
+{
+  "name": "scs",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n admin,screen,mobile \"npm run dev:admin\" \"npm run dev:screen\" \"npm run dev:mobile\"",
+    "dev:admin": "cd admin && pnpm run dev",
+    "dev:screen": "cd screen && npm run dev",
+    "dev:mobile": "cd mobile && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

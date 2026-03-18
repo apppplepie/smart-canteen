@@ -1,0 +1,19 @@
+# 用于 frontends 镜像构建（context 为仓库根时）
+.git
+.gitignore
+*.md
+.env
+.env.*
+backend
+ai-service
+deploy
+docker-compose.yml
+docker-compose.deploy.yml
+docker-compose.frontend.yml
+node_modules
+admin/node_modules
+mobile/node_modules
+screen/node_modules
+*.tar.gz
+*.bat
+terminals

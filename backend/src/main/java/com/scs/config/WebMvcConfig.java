@@ -33,13 +33,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOriginPatterns(
-                        "http://localhost:*",
-                        "http://127.0.0.1:*",
-                        "http://localhost:5175",
-                        "http://127.0.0.1:5175"
-                )
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                // 允许任意来源（admin/screen/mobile 任意端口、域名均可跨域）；生产可改为具体域名列表
+                .allowedOriginPatterns("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(false)
                 .maxAge(3600);

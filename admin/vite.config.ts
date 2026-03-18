@@ -13,8 +13,13 @@ import svgLoader from "vite-svg-loader"
 
 // Configuring Vite: https://cn.vite.dev/config
 export default defineConfig(({ mode }) => {
-  const { VITE_PUBLIC_PATH } = loadEnv(mode, process.cwd(), "") as ImportMetaEnv
+  const envDir = resolve(__dirname, "..")
+  const env = loadEnv(mode, envDir, "") as ImportMetaEnv & { DEEPSEEK_API_KEY?: string; VITE_API_BASE_URL?: string }
+  const { VITE_PUBLIC_PATH } = env
+  const backendUrl = env.VITE_API_BASE_URL || "http://localhost:8081"
   return {
+    // 与 loadEnv 一致：从仓库根目录读 .env，否则 import.meta.env 只会读到 admin/.env（空）
+    envDir,
     // 开发或打包构建时用到的公共基础路径
     base: VITE_PUBLIC_PATH,
     resolve: {
@@ -38,7 +43,7 @@ export default defineConfig(({ mode }) => {
       // 反向代理：接口请求转发到 scs 后端
       proxy: {
         "/api": {
-          target: "http://localhost:8081",
+          target: backendUrl,
           ws: false,
           changeOrigin: true
         },
@@ -48,7 +53,7 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/deepseek/, ""),
           headers: {
-            Authorization: `Bearer ${loadEnv(mode, process.cwd(), "").DEEPSEEK_API_KEY}`
+            Authorization: `Bearer ${env.DEEPSEEK_API_KEY || ""}`
           }
         }
       },
