@@ -60,8 +60,9 @@ export interface CurrentUser {
 
 function getBase(): string {
   const base = getBaseUrl();
-  if (!base) throw new Error("VITE_API_BASE_URL 未配置");
-  return base.replace(/\/$/, "");
+  if (base) return base.replace(/\/$/, "");
+  if (import.meta.env.VITE_API_SAME_ORIGIN === "true") return "";
+  throw new Error("VITE_API_BASE_URL 未配置");
 }
 
 /**

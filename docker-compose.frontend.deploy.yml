@@ -1,14 +1,14 @@
-# 服务器上只拉前端镜像、不构建。与 docker-compose.deploy.yml 用法一致。
-# 服务器用法：
-#   export DOCKERHUB_USER=你的用户名   # 或写在 .env
-#   docker compose -f docker-compose.frontend.deploy.yml pull
-#   docker compose -f docker-compose.frontend.deploy.yml up -d
-# 访问：http://服务器IP或域名/（screen）、http://服务器IP或域名/admin、/mobile
+# 详见仓库 docs/部署命令备忘.md
+# 服务器 /srv/scs/.env 必写 BACKEND_UPSTREAM（后端完整地址，含端口）
 
 services:
   frontends:
-    image: ${DOCKERHUB_USER:-yourname}/scs-frontends:latest
+    image: ${DOCKERHUB_USER:-creepender42}/scs-frontends:latest
     container_name: scs-frontends
     ports:
-      - "80:80"
+      - "${FRONTEND_HOST_PORT:-9080}:80"
+    environment:
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-http://172.17.0.1:8081}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped

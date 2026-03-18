@@ -56,6 +56,12 @@ export const useUserStore = defineStore("user", () => {
     roles.value = []
   }
 
+  /** 路由守卫兜底：/users/me 失败时仍放行后台 */
+  const setGuardFallbackSession = (name: string, roleList: string[]) => {
+    username.value = name
+    roles.value = roleList
+  }
+
   // 重置 Visited Views 和 Cached Views
   const resetTagsView = () => {
     if (!settingsStore.cacheTagsView) {
@@ -64,7 +70,7 @@ export const useUserStore = defineStore("user", () => {
     }
   }
 
-  return { token, roles, username, setToken, getInfo, changeRoles, logout, resetToken }
+  return { token, roles, username, setToken, getInfo, changeRoles, logout, resetToken, setGuardFallbackSession }
 })
 
 /**

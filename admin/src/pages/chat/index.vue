@@ -15,7 +15,9 @@ function authHeaders(): HeadersInit {
   return headers
 }
 
-const CHAT_API_BASE = (import.meta.env.VITE_CHAT_API_BASE_URL as string) || "http://localhost:8081"
+const CHAT_API_BASE =
+  (import.meta.env.VITE_CHAT_API_BASE_URL as string)?.replace(/\/$/, "")
+  || (import.meta.env.VITE_API_SAME_ORIGIN === "true" ? "" : "http://localhost:8081")
 const userStore = useUserStore()
 /** 可选：用于拉取历史对话的用户 ID，不传则后端返回空列表 */
 const AI_USER_ID = import.meta.env.VITE_AI_USER_ID ? Number(import.meta.env.VITE_AI_USER_ID) : null

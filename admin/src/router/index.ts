@@ -47,7 +47,7 @@ export const constantRoutes: RouteRecordRaw[] = [
       hidden: true
     }
   },
-  { path: "/", redirect: "/dashboard", meta: { hidden: true } },
+  { path: "/", redirect: "/login", meta: { hidden: true } },
   {
     path: "/dashboard",
     component: Layouts,

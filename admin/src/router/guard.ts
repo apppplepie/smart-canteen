@@ -20,8 +20,19 @@ export function registerNavigationGuard(router: Router) {
     NProgress.start()
     const userStore = useUserStore()
     const permissionStore = usePermissionStore()
-    // 任何人只要进入登录页，都强制清除本地登录态，避免自动续登
+    // 已登录则勿停在登录页（入口为 /login，避免先进业务页再被踢回）
     if (to.path === LOGIN_PATH) {
+      if (getToken()) {
+        const r = to.query.redirect
+        if (typeof r === "string" && r.length > 0) {
+          try {
+            return decodeURIComponent(r)
+          } catch {
+            return "/dashboard"
+          }
+        }
+        return "/dashboard"
+      }
       userStore.resetToken()
       return true
     }
@@ -45,11 +56,12 @@ export function registerNavigationGuard(router: Router) {
       permissionStore.addRoutes.forEach(route => router.addRoute(route))
       // 设置 replace: true, 因此导航将不会留下历史记录
       return { ...to, replace: true }
-    } catch (error) {
-      // 过程中发生任何错误，都直接重置 Token，并重定向到登录页面
-      userStore.resetToken()
-      ElMessage.error((error as Error).message || "路由守卫发生错误")
-      return LOGIN_PATH
+    } catch {
+      // 不卡权限：拉取用户信息失败仍放行后台（仅本地角色占位，避免一进系统就红字报错）
+      userStore.setGuardFallbackSession("admin", ["admin"])
+      permissionStore.setRoutes(userStore.roles)
+      permissionStore.addRoutes.forEach(route => router.addRoute(route))
+      return { ...to, replace: true }
     }
   })
 

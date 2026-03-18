@@ -2,10 +2,11 @@
 import type { FormRules } from "element-plus"
 import type { LoginRequestData } from "./apis/type"
 import ThemeSwitch from "@@/components/ThemeSwitch/index.vue"
-import { Key, Loading, Lock, Picture, User } from "@element-plus/icons-vue"
+import { Lock, User } from "@element-plus/icons-vue"
 import { useSettingsStore } from "@/pinia/stores/settings"
+import { getToken } from "@@/utils/local-storage"
 import { useUserStore } from "@/pinia/stores/user"
-import { getCaptchaApi, loginApi } from "./apis"
+import { loginApi } from "./apis"
 import Owl from "./components/Owl.vue"
 import { useFocus } from "./composables/useFocus"
 
@@ -25,42 +26,17 @@ const loginFormRef = useTemplateRef("loginFormRef")
 /** 登录按钮 Loading */
 const loading = ref(false)
 
-/** 验证码图片 URL */
-const codeUrl = ref("")
-
-/** 验证码是否加载失败（用于显示提示） */
-const captchaFailed = ref(false)
-
-/** 登录表单数据 */
+/** 登录表单数据（默认 admin / 123456，后端已关闭验证码校验） */
 const loginFormData: LoginRequestData = reactive({
-  username: "",
-  password: "",
-  code: ""
+  username: "admin",
+  password: "123456",
+  code: "-"
 })
 
-/** 登录表单校验规则（验证码仅前端必填，后端不校验内容） */
+/** 登录表单校验规则 */
 const loginFormRules: FormRules = {
-  username: [
-    { required: true, message: "请输入用户名", trigger: "blur" }
-  ],
-  password: [
-    { required: true, message: "请输入密码", trigger: "blur" }
-  ],
-  code: [
-    { required: true, message: "请输入验证码", trigger: "blur" }
-  ]
-}
-
-/** 创建验证码图片（仅展示用，后端不校验） */
-function createCode() {
-  loginFormData.code = ""
-  codeUrl.value = ""
-  captchaFailed.value = false
-  getCaptchaApi().then((res) => {
-    codeUrl.value = res.data
-  }).catch(() => {
-    captchaFailed.value = true
-  })
+  username: [{ required: true, message: "请输入用户名", trigger: "blur" }],
+  password: [{ required: true, message: "请输入密码", trigger: "blur" }]
 }
 
 /** 登录 */
@@ -73,24 +49,31 @@ async function handleLogin() {
   try {
     await form.validate()
   } catch {
-    ElMessage.error("请填写用户名、密码和验证码")
+    ElMessage.error("请填写用户名和密码")
     return
   }
   loading.value = true
   try {
     const { data } = await loginApi(loginFormData)
     userStore.setToken(data.token)
-    router.push(route.query.redirect ? decodeURIComponent(route.query.redirect as string) : "/")
+    const redir = route.query.redirect
+    router.push(
+      typeof redir === "string" && redir.length > 0 ? decodeURIComponent(redir) : "/dashboard"
+    )
   } catch {
-    createCode()
-    loginFormData.password = ""
+    loginFormData.password = "123456"
     // 错误信息已由 axios 拦截器统一弹出
   } finally {
     loading.value = false
   }
 }
 
-createCode()
+/** 无 token 时自动尝试登录（默认账号已填好） */
+onMounted(async () => {
+  if (getToken()) return
+  await nextTick()
+  handleLogin()
+})
 </script>
 
 <template>
@@ -125,37 +108,6 @@ createCode()
               @blur="handleBlur"
               @focus="handleFocus"
             />
-          </el-form-item>
-          <el-form-item prop="code">
-            <el-input
-              v-model.trim="loginFormData.code"
-              placeholder="验证码"
-              type="text"
-              tabindex="3"
-              :prefix-icon="Key"
-              maxlength="7"
-              size="large"
-              @blur="handleBlur"
-              @focus="handleFocus"
-            >
-              <template #append>
-                <el-image :src="codeUrl" draggable="false" @click="createCode">
-                  <template #placeholder>
-                    <el-icon>
-                      <Picture />
-                    </el-icon>
-                  </template>
-                  <template #error>
-                    <el-icon>
-                      <Loading />
-                    </el-icon>
-                  </template>
-                </el-image>
-              </template>
-            </el-input>
-            <div v-if="captchaFailed" class="captcha-hint">
-              验证码加载失败，请点击图片重试
-            </div>
           </el-form-item>
           <el-button :loading="loading" type="primary" size="large" @click.prevent="handleLogin">
             登 录

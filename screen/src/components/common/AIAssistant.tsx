@@ -44,8 +44,9 @@ export function AIAssistant() {
     setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setIsLoading(true);
 
-    const baseUrl = getApiBaseUrl();
-    if (!baseUrl) {
+    const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+    const sameOrigin = import.meta.env.VITE_API_SAME_ORIGIN === "true";
+    if (!baseUrl && !sameOrigin) {
       setMessages(prev => [
         ...prev,
         { role: 'ai', text: '请配置 .env 中的 VITE_API_BASE_URL（Spring Boot 地址）后重启开发服务器。' },
@@ -53,6 +54,8 @@ export function AIAssistant() {
       setIsLoading(false);
       return;
     }
+
+    const url = baseUrl ? `${baseUrl}/api/ai/chat` : "/api/ai/chat";
 
     // 对话由后端 Agent 处理（clientType=screen，可查 vendors 等），不再带前端假数据
     const apiMessages: { role: string; content: string }[] = [
@@ -70,7 +73,7 @@ export function AIAssistant() {
     if (conversationId != null) body.conversationId = conversationId;
 
     try {
-      const res = await fetch(`${baseUrl}/api/ai/chat`, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: screenHeaders(),
         body: JSON.stringify(body),

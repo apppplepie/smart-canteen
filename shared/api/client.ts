@@ -1,7 +1,11 @@
 /**
  * 共享 API 客户端：baseURL 来自 VITE_API_BASE_URL。
- * 未配置时 getBaseUrl() 返回 ''，isApiConfigured() 为 false，apiGet/apiPost 等会抛错，便于各端回退 mock。
+ * 构建时设 VITE_API_SAME_ORIGIN=true 且留空 VITE_API_BASE_URL 时，请求走当前站点 /api/（由 Nginx 反代后端）。
  */
+
+function sameOriginApi(): boolean {
+  return typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_SAME_ORIGIN === "true";
+}
 
 function getBaseUrl(): string {
   const url = typeof import.meta !== "undefined" ? (import.meta as any).env?.VITE_API_BASE_URL : "";
@@ -13,13 +17,15 @@ export function getApiBaseUrl(): string {
 }
 
 export function isApiConfigured(): boolean {
-  return !!getBaseUrl();
+  return !!getBaseUrl() || sameOriginApi();
 }
 
-function ensureBase(): string {
+function resolveFetchUrl(path: string): string {
   const base = getBaseUrl();
-  if (!base) throw new Error("VITE_API_BASE_URL not configured");
-  return base;
+  const p = path.startsWith("/") ? path : `/${path}`;
+  if (base) return `${base}${p}`;
+  if (sameOriginApi()) return p;
+  throw new Error("VITE_API_BASE_URL not configured");
 }
 
 export class ApiError extends Error {
@@ -34,9 +40,7 @@ export class ApiError extends Error {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const base = ensureBase();
-  const p = path.startsWith("/") ? path : `/${path}`;
-  const res = await fetch(`${base}${p}`, {
+  const res = await fetch(resolveFetchUrl(path), {
     method: "GET",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
   });
@@ -49,9 +53,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const base = ensureBase();
-  const p = path.startsWith("/") ? path : `/${path}`;
-  const res = await fetch(`${base}${p}`, {
+  const res = await fetch(resolveFetchUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
@@ -65,9 +67,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
-  const base = ensureBase();
-  const p = path.startsWith("/") ? path : `/${path}`;
-  const res = await fetch(`${base}${p}`, {
+  const res = await fetch(resolveFetchUrl(path), {
     method: "PUT",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
@@ -81,9 +81,7 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function apiDelete(path: string): Promise<void> {
-  const base = ensureBase();
-  const p = path.startsWith("/") ? path : `/${path}`;
-  const res = await fetch(`${base}${p}`, { method: "DELETE" });
+  const res = await fetch(resolveFetchUrl(path), { method: "DELETE" });
   if (!res.ok && res.status !== 204) {
     const body = await res.text().catch(() => res.statusText);
     throw new ApiError(body || res.statusText, res.status, body);

@@ -1,15 +1,15 @@
-# 仅三个前端，用 nginx 托管
-# 本地运行：docker compose -f docker-compose.frontend.yml up -d
-# 打包推服务器：见下方注释
-# 访问：http://localhost/（screen 入口）、http://localhost/admin、http://localhost/mobile
+# 打包：docker compose -f docker-compose.frontend.yml build
+# 本机试跑：根目录 .env 可写 BACKEND_UPSTREAM，再 up -d
 
 services:
   frontends:
-    image: ${DOCKERHUB_USER:-yourname}/scs-frontends:latest
+    image: ${DOCKERHUB_USER:-creepender42}/scs-frontends:latest
     build:
       context: .
       dockerfile: frontends/Dockerfile
     container_name: scs-frontends
     ports:
-      - "80:80"
+      - "${FRONTEND_HOST_PORT:-9080}:80"
+    environment:
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-http://172.17.0.1:8081}
     restart: unless-stopped

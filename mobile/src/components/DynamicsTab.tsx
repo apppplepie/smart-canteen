@@ -48,11 +48,13 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [historyDish, setHistoryDish] = useState<HistoryDishItem | null>(null);
 
-  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+  const baseUrl =
+    (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "") ||
+    (import.meta.env.VITE_API_SAME_ORIGIN === "true" ? "" : "");
   const apiBase = getBaseUrl();
 
   const fetchPosts = React.useCallback(async () => {
-    if (!baseUrl) return;
+    if (baseUrl === "" && import.meta.env.VITE_API_SAME_ORIGIN !== "true") return;
     try {
       const [postList, vendorList] = await Promise.all([
         listPosts(), // 不传 postType，拉取数据库全部帖子
@@ -84,7 +86,7 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
   }, [apiBase]);
 
   useEffect(() => {
-    if (!baseUrl) {
+    if (baseUrl === "" && import.meta.env.VITE_API_SAME_ORIGIN !== "true") {
       setLoading(false);
       return;
     }

@@ -164,7 +164,8 @@ export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
 
     setIsLoading(true);
     try {
-      if (!API_BASE_URL) {
+      const sameOrigin = import.meta.env.VITE_API_SAME_ORIGIN === "true";
+      if (!API_BASE_URL && !sameOrigin) {
         console.warn("VITE_API_BASE_URL 为空，请检查 .env 并重启前端 dev (npm run dev)");
         throw new Error("未配置 VITE_API_BASE_URL，请在 .env 中设置后端地址");
       }

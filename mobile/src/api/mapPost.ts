@@ -11,9 +11,14 @@ const defaultAvatar = "https://api.dicebear.com/7.x/avataaars/svg?seed=user";
  */
 export function postToSharedPost(post: PostDto, vendorName?: string, baseUrl?: string): SharedPost {
   let image: string | undefined;
-  if (post.imageUrl && baseUrl) {
-    const base = baseUrl.replace(/\/$/, "");
-    image = post.imageUrl.startsWith("http") ? post.imageUrl : base + (post.imageUrl.startsWith("/") ? post.imageUrl : "/" + post.imageUrl);
+  if (post.imageUrl) {
+    if (post.imageUrl.startsWith("http")) image = post.imageUrl;
+    else if (baseUrl) {
+      const base = baseUrl.replace(/\/$/, "");
+      image = base + (post.imageUrl.startsWith("/") ? post.imageUrl : "/" + post.imageUrl);
+    } else {
+      image = post.imageUrl.startsWith("/") ? post.imageUrl : `/${post.imageUrl}`;
+    }
   } else if (post.mediaUrls) {
     try {
       const urls = JSON.parse(post.mediaUrls) as string[];
@@ -27,7 +32,11 @@ export function postToSharedPost(post: PostDto, vendorName?: string, baseUrl?: s
     post.userImageUrl != null && post.userImageUrl !== ""
       ? post.userImageUrl.startsWith("http")
         ? post.userImageUrl
-        : base + (post.userImageUrl.startsWith("/") ? post.userImageUrl : "/" + post.userImageUrl)
+        : base
+          ? base + (post.userImageUrl.startsWith("/") ? post.userImageUrl : "/" + post.userImageUrl)
+          : post.userImageUrl.startsWith("/")
+            ? post.userImageUrl
+            : `/${post.userImageUrl}`
       : defaultAvatar;
   const content = (post.content ?? "").trim();
   const title = (post.title ?? "").trim();

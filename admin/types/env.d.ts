@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_PUBLIC_PATH: string
   /** AI 对话后端（Spring Boot），默认 http://localhost:8081 */
   readonly VITE_CHAT_API_BASE_URL?: string
+  /** Docker 部署：走同源 /api，由 Nginx 反代 */
+  readonly VITE_API_SAME_ORIGIN?: string
 }
 
 interface ImportMeta {
