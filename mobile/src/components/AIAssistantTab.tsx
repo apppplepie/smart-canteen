@@ -23,13 +23,15 @@ import { MealRecommendationCard } from "./MealRecommendationCard";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
-/** 低脂减脂餐卡片的展示数据（前端 mock，后续可接后端） */
+/** 餐品推荐卡片：由后端根据 AI 工具 recommend_meal_card + 数据库菜品组装 */
 export interface MealRecommendationCardPayload {
   merchantName: string;
   dishName: string;
   rating: number;
   time: string;
   image: string;
+  locationLabel?: string;
+  menuItemId?: number;
 }
 
 interface Message {
@@ -48,17 +50,6 @@ const WELCOME_MSG: Message = {
   content:
     "你好！我是你的食堂AI点餐助手 🤖\n\n不知道吃什么？时间太紧？或者想找点特定口味的菜品？随时问我！",
   suggestions: aiAssistantSuggestionsMock,
-};
-
-/** 点击此推荐语时，前端直接回复一张低脂减脂餐推荐卡片（不请求后端） */
-const MEAL_RECOMMENDATION_SUGGESTION = "推荐低脂减脂餐";
-
-const MOCK_MEAL_CARD: MealRecommendationCardPayload = {
-  merchantName: "健康轻食沙拉",
-  dishName: "鸡胸肉藜麦减脂餐",
-  rating: 4.8,
-  time: "约 8 分钟",
-  image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
 };
 
 function formatConversationTime(iso: string): string {
@@ -149,19 +140,6 @@ export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
 
-    // 前端逻辑：点击「推荐低脂减脂餐」时直接插入卡片消息，不请求后端
-    if (text.trim() === MEAL_RECOMMENDATION_SUGGESTION) {
-      const cardMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "为你推荐一款低脂减脂餐，轻卡饱腹～",
-        card: "mealRecommendation",
-        cardPayload: MOCK_MEAL_CARD,
-      };
-      setMessages((prev) => [...prev, cardMsg]);
-      return;
-    }
-
     setIsLoading(true);
     try {
       const sameOrigin = import.meta.env.VITE_API_SAME_ORIGIN === "true";
@@ -207,7 +185,24 @@ export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
       });
 
       const raw = await res.text();
-      let data: { code?: number; data?: { content?: string; conversationId?: number }; message?: string; content?: string };
+      let data: {
+        code?: number;
+        data?: {
+          content?: string;
+          conversationId?: number;
+          mealCard?: {
+            menuItemId?: number;
+            merchantName?: string;
+            dishName?: string;
+            rating?: number;
+            time?: string;
+            image?: string;
+            locationLabel?: string;
+          };
+        };
+        message?: string;
+        content?: string;
+      };
       try {
         data = raw ? JSON.parse(raw) : {};
       } catch {
@@ -217,15 +212,40 @@ export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
         (data?.data?.content ?? data?.content ?? "").trim() ||
         "前端取到了空值";
       const newConvId = data?.data?.conversationId;
+      const rawMeal = data?.data?.mealCard;
 
       if (!res.ok) {
         throw new Error(data?.message ?? data?.content ?? `请求失败 ${res.status}`);
       }
 
+      const mealCardPayload: MealRecommendationCardPayload | undefined =
+        rawMeal &&
+        rawMeal.merchantName &&
+        rawMeal.dishName &&
+        rawMeal.image &&
+        typeof rawMeal.rating === "number" &&
+        rawMeal.time
+          ? {
+              merchantName: rawMeal.merchantName,
+              dishName: rawMeal.dishName,
+              rating: rawMeal.rating,
+              time: rawMeal.time,
+              image: rawMeal.image,
+              locationLabel: rawMeal.locationLabel,
+              menuItemId: rawMeal.menuItemId,
+            }
+          : undefined;
+
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content,
+        ...(mealCardPayload
+          ? {
+              card: "mealRecommendation" as const,
+              cardPayload: mealCardPayload,
+            }
+          : {}),
       };
 
       setMessages((prev) => [...prev, aiMsg]);

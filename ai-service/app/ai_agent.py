@@ -172,6 +172,19 @@ query_menu_item_materials = StructuredTool.from_function(
 
 
 @tool
+def recommend_meal_card(menu_item_id: str) -> str:
+    """在用户需要具体菜品推荐、且你已用 query_menu_items 等工具确认该菜品在数据库中存在时调用。
+    menu_item_id 为菜单项的数字 ID（字符串形式即可）。调用后移动端会展示该菜的推荐卡片；请仍用自然语言简要说明推荐理由。"""
+    try:
+        mid = int(str(menu_item_id).strip())
+    except (TypeError, ValueError):
+        return json.dumps({"ok": False, "error": "invalid menu_item_id"}, ensure_ascii=False)
+    if mid <= 0:
+        return json.dumps({"ok": False, "error": "invalid menu_item_id"}, ensure_ascii=False)
+    return json.dumps({"ok": True, "menu_item_id": mid}, ensure_ascii=False)
+
+
+@tool
 def update_post_ai_suggestion(post_id: str, ai_suggestion: str) -> str:
     """将 AI 分析建议写回指定反馈帖子的 ai_suggestion 字段，并把状态设为 ai_replied。post_id 为数字 ID，ai_suggestion 为要写入的文本。"""
     return _patch(
@@ -190,6 +203,7 @@ ALL_TOOLS = [
     list_posts,
     *TABLE_QUERY_TOOLS,
     query_data_table,
+    recommend_meal_card,
 ]
 ALL_TOOL_NAMES = [t.name for t in ALL_TOOLS]
 TOOLS_BY_NAME = {t.name: t for t in ALL_TOOLS}
@@ -258,6 +272,7 @@ TOOLS_FOR_MOBILE = [
     list_posts,
     TOOLS_BY_NAME["query_vendors"],
     TOOLS_BY_NAME["query_menu_items"],
+    recommend_meal_card,
     TOOLS_BY_NAME["query_orders"],
     TOOLS_BY_NAME["query_order_items"],
     TOOLS_BY_NAME["query_queue_entries"],
@@ -269,12 +284,21 @@ TOOLS_FOR_MOBILE_NO_USER = [
     list_posts,
     TOOLS_BY_NAME["query_vendors"],
     TOOLS_BY_NAME["query_menu_items"],
+    recommend_meal_card,
 ]
 
 # 大屏 AI 助手角色说明，会注入到 screen 请求的首条系统消息
 SCREEN_SYSTEM_PROMPT = """你是食堂大屏的 AI 助手，负责给学生推荐食堂、商家并回答与食堂相关的问题。
 你可以使用 query_vendors 工具查询商家/供应商表（食堂窗口、档口等），根据查询结果推荐今日可去的食堂与档口。
 请保持热情、友好、简洁。若问题与食堂无关，可委婉引导回食堂话题。"""
+
+MOBILE_SYSTEM_PROMPT = """你是大学食堂的智能点餐助手，语气活泼、友好。
+当用户想要「推荐菜品」「不知道吃什么」「低脂/减脂/辣/出餐快」等时：
+1. 先用 query_vendors、query_menu_items 等工具查询真实档口与菜品（注意分页，可多查）。
+2. 选定一道你认为最合适、且在数据里存在的菜品后，必须调用 recommend_meal_card(menu_item_id="该菜品的数字ID")，这样用户端会展示推荐卡片。
+3. 再用一两句话说明推荐理由。
+
+不要编造菜单 ID；必须先查表确认菜品存在再调用 recommend_meal_card。若用户只是闲聊、不要求具体推荐，不必调用该工具。"""
 
 
 def _make_mobile_scoped_tools(user_id: int | None) -> list:
@@ -335,6 +359,7 @@ def get_tools_for_request(client_type: str, role: str | None, user_id: int | Non
                 list_posts,
                 TOOLS_BY_NAME["query_vendors"],
                 TOOLS_BY_NAME["query_menu_items"],
+                recommend_meal_card,
             ]
             return base + _make_mobile_scoped_tools(user_id)
         return list(TOOLS_FOR_MOBILE_NO_USER)
@@ -507,10 +532,12 @@ def process_message(
             empty["content"] = "请说一句你想查的内容。"
         return empty
 
-    # 构建发给 Agent 的消息：screen 时注入角色说明；可选小结；最近几轮
+    # 构建发给 Agent 的消息：screen / mobile 时注入角色说明；可选小结；最近几轮
     lc_messages = []
     if client_type == CLIENT_SCREEN:
         lc_messages.append(SystemMessage(content=SCREEN_SYSTEM_PROMPT))
+    if client_type == CLIENT_MOBILE:
+        lc_messages.append(SystemMessage(content=MOBILE_SYSTEM_PROMPT))
     if context_summary and context_summary.strip():
         lc_messages.append(
             SystemMessage(content=f"【此前对话摘要】\n{context_summary.strip()}\n\n【以下为最近对话】")

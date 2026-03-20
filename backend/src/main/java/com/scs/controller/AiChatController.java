@@ -5,8 +5,10 @@ import com.scs.config.CurrentUserHolder;
 import com.scs.dto.ApiResult;
 import com.scs.entity.AiConversation;
 import com.scs.entity.AiMessage;
+import com.scs.entity.Vendor;
 import com.scs.repository.AiConversationRepository;
 import com.scs.repository.AiMessageRepository;
+import com.scs.repository.MenuItemRepository;
 import com.scs.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,13 +49,15 @@ public class AiChatController {
     private final AiConversationRepository conversationRepo;
     private final AiMessageRepository messageRepo;
     private final UserRepository userRepo;
+    private final MenuItemRepository menuItemRepo;
 
     public AiChatController(
             @Value("${ai.service.base-url:http://localhost:8000}") String aiServiceBaseUrl,
             ObjectMapper objectMapper,
             AiConversationRepository conversationRepo,
             AiMessageRepository messageRepo,
-            UserRepository userRepo) {
+            UserRepository userRepo,
+            MenuItemRepository menuItemRepo) {
         this.aiServiceBaseUrl = (aiServiceBaseUrl != null && !aiServiceBaseUrl.isBlank())
                 ? aiServiceBaseUrl.trim().replaceAll("/$", "") : "http://localhost:8000";
         log.info("[AI] 使用 ai.service.base-url={}", this.aiServiceBaseUrl);
@@ -61,6 +65,92 @@ public class AiChatController {
         this.conversationRepo = conversationRepo;
         this.messageRepo = messageRepo;
         this.userRepo = userRepo;
+        this.menuItemRepo = menuItemRepo;
+    }
+
+    private static final String DEFAULT_MEAL_IMAGE =
+            "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop";
+
+    private static String formatPrepTimeMinutes(Integer prepTimeSeconds) {
+        if (prepTimeSeconds == null || prepTimeSeconds <= 0) {
+            return "约 10 分钟";
+        }
+        int minutes = (prepTimeSeconds + 59) / 60;
+        return "约 " + minutes + " 分钟";
+    }
+
+    /**
+     * 从 FastAPI 返回的 tool_calls 中解析最后一次 recommend_meal_card 的 menu_item_id。
+     */
+    private Long parseRecommendedMenuItemId(Object toolCallsObj) {
+        if (!(toolCallsObj instanceof List<?> list) || list.isEmpty()) {
+            return null;
+        }
+        for (int i = list.size() - 1; i >= 0; i--) {
+            Object el = list.get(i);
+            if (!(el instanceof Map<?, ?> tc)) {
+                continue;
+            }
+            Object name = tc.get("name");
+            if (name == null || !"recommend_meal_card".contentEquals(name.toString())) {
+                continue;
+            }
+            Object argsObj = tc.get("args");
+            if (!(argsObj instanceof Map<?, ?> args)) {
+                continue;
+            }
+            Object mid = args.get("menu_item_id");
+            if (mid == null) {
+                mid = args.get("menuItemId");
+            }
+            if (mid == null) {
+                continue;
+            }
+            try {
+                if (mid instanceof Number n) {
+                    return n.longValue();
+                }
+                return Long.parseLong(mid.toString().trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private Map<String, Object> buildMealCardPayload(Long menuItemId) {
+        if (menuItemId == null) {
+            return null;
+        }
+        return menuItemRepo.findByIdWithVendor(menuItemId)
+                .filter(mi -> Boolean.TRUE.equals(mi.getIsAvailable()))
+                .map(mi -> {
+                    Vendor v = mi.getVendor();
+                    String merchantName = v != null && v.getName() != null ? v.getName() : "食堂档口";
+                    String location = v != null && v.getLocationLabel() != null && !v.getLocationLabel().isBlank()
+                            ? v.getLocationLabel()
+                            : "食堂";
+                    double rating = 4.5;
+                    if (v != null && v.getRatingAvg() != null) {
+                        rating = Math.round(v.getRatingAvg() * 10.0) / 10.0;
+                    }
+                    String image = DEFAULT_MEAL_IMAGE;
+                    if (mi.getImageUrl() != null && !mi.getImageUrl().isBlank()) {
+                        image = mi.getImageUrl();
+                    } else if (v != null && v.getImageUrl() != null && !v.getImageUrl().isBlank()) {
+                        image = v.getImageUrl();
+                    }
+                    return Map.<String, Object>of(
+                            "menuItemId", mi.getId(),
+                            "merchantName", merchantName,
+                            "dishName", mi.getName() != null ? mi.getName() : "推荐菜品",
+                            "rating", rating,
+                            "time", formatPrepTimeMinutes(mi.getPrepTimeSeconds()),
+                            "image", image,
+                            "locationLabel", location
+                    );
+                })
+                .orElse(null);
     }
 
     @GetMapping(value = {"", "/health"}, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -317,10 +407,20 @@ public class AiChatController {
 
             Long convId = conversation.getId();
             log.info("[AI chat] 助手回复已存库, conversationId={}", convId);
-            return ApiResult.ok(Map.of(
-                    "content", content,
-                    "conversationId", convId
-            ));
+
+            Long recommendedId = parseRecommendedMenuItemId(response != null ? response.get("tool_calls") : null);
+            Map<String, Object> mealCard = buildMealCardPayload(recommendedId);
+            if (recommendedId != null && mealCard == null) {
+                log.warn("[AI chat] recommend_meal_card menu_item_id={} 未找到可用菜品，忽略卡片", recommendedId);
+            }
+
+            Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("content", content);
+            data.put("conversationId", convId);
+            if (mealCard != null) {
+                data.put("mealCard", mealCard);
+            }
+            return ApiResult.ok(data);
         } catch (HttpStatusCodeException e) {
             int status = e.getStatusCode().value();
             String errorBody = e.getResponseBodyAsString();

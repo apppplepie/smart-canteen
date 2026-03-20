@@ -9,6 +9,8 @@ interface MealRecommendationCardProps {
   rating: number;
   time: string;
   image: string;
+  /** 档口位置等展示文案；未传时使用默认占位 */
+  locationLabel?: string;
   onOrder: () => void;
 }
 
@@ -18,6 +20,7 @@ export function MealRecommendationCard({
   rating,
   time,
   image,
+  locationLabel = "食堂",
   onOrder,
 }: MealRecommendationCardProps) {
   return (
@@ -53,7 +56,7 @@ export function MealRecommendationCard({
 
         <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
           <MapPin size={12} />
-          <span>2F 西区 · 减脂餐专区</span>
+          <span>{locationLabel}</span>
         </div>
 
         <button
