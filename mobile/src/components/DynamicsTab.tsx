@@ -22,8 +22,13 @@ import { listOrderItemsByOrder } from "../api/orderItems";
 import { getMenuItem } from "../api/menuItems";
 import { getBaseUrl, ApiError } from "../api/client";
 import { postToSharedPost } from "../api/mapPost";
+import { listAiPeriodReports, type AiReportListItem } from "../api/snapshots";
 import type { SharedPost } from "./SharedPostDetail";
+import type { Vendor } from "../api/types";
 import { dynamicsPostsFallbackMock, type DynamicsPost } from "../mocks/dynamicsPosts";
+import { AISummaryCard } from "./AISummaryCard";
+import { AISummaryDetail } from "./AISummaryDetail";
+import { buildAiSummaryBundle, getRollingWeekRange } from "../lib/aiSummaryBuild";
 
 /** 从历史订单解析出的最近一单菜品，用于快速发布卡片（仅未评价订单） */
 type HistoryDishItem = {
@@ -35,14 +40,23 @@ type HistoryDishItem = {
   totalAmount?: number;
 };
 
-export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
+export function DynamicsTab({
+  user,
+  onNavigateToOnlineService,
+}: {
+  user?: { userId?: number } | null;
+  onNavigateToOnlineService?: (section: "lost" | "found") => void;
+}) {
   const [isPublishing, setIsPublishing] = useState(false);
   const [activeTab, setActiveTab] = useState<"推荐" | "最新">("推荐");
   const [selectedPost, setSelectedPost] = useState<SharedPost | null>(null);
   const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
   const [posts, setPosts] = useState<SharedPost[]>(dynamicsPostsFallbackMock);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [latestLostItem, setLatestLostItem] = useState<SharedPost | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAiSummary, setShowAiSummary] = useState(false);
+  const [weeklyAiReport, setWeeklyAiReport] = useState<AiReportListItem | null>(null);
   const [rating, setRating] = useState(0);
   const [submittingRating, setSubmittingRating] = useState(false);
   const [ratingError, setRatingError] = useState<string | null>(null);
@@ -68,10 +82,32 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
       });
       const mapped = sorted.map((p) => postToSharedPost(p, vendorMap.get(p.vendorId ?? 0), baseUrl));
       setPosts(mapped);
+      setVendors(vendorList);
     } catch {
       setPosts(dynamicsPostsFallbackMock);
+      setVendors([]);
     }
   }, [baseUrl]);
+
+  useEffect(() => {
+    if (!apiBase) return;
+    let cancelled = false;
+    listAiPeriodReports({ reportType: "weekly_posts_digest", page: 1, size: 1 })
+      .then((r) => {
+        if (!cancelled) setWeeklyAiReport(r.items[0] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setWeeklyAiReport(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase]);
+
+  const aiBundle = useMemo(
+    () => buildAiSummaryBundle(posts, vendors, weeklyAiReport, getRollingWeekRange()),
+    [posts, vendors, weeklyAiReport],
+  );
 
   const fetchLatestLost = React.useCallback(async () => {
     if (!apiBase) return;
@@ -276,9 +312,33 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
   return (
     <div className="h-full bg-gray-50 flex flex-col relative overflow-y-auto no-scrollbar pb-24">
       <AnimatePresence>
-        {selectedMerchantId ? (
+        {showAiSummary ? (
+          <AISummaryDetail
+            key="ai-summary-detail"
+            content={aiBundle.detail}
+            onBack={() => setShowAiSummary(false)}
+            onPostClick={(p) => {
+              setShowAiSummary(false);
+              setSelectedPost(p);
+            }}
+            onMerchantClick={(id) => {
+              setShowAiSummary(false);
+              setSelectedMerchantId(id);
+            }}
+            onNavigateToOnlineService={(section) => {
+              setShowAiSummary(false);
+              onNavigateToOnlineService?.(section);
+            }}
+          />
+        ) : selectedMerchantId ? (
           <MerchantPage
-            merchant={{ id: selectedMerchantId, name: posts.find((p) => p.merchantId === selectedMerchantId)?.merchantName ?? "商家" }}
+            merchant={{
+              id: selectedMerchantId,
+              name:
+                vendors.find((v) => v.id === selectedMerchantId)?.name ??
+                posts.find((p) => p.merchantId === selectedMerchantId)?.merchantName ??
+                "商家",
+            }}
             onBack={() => setSelectedMerchantId(null)}
             key="merchant-page"
           />
@@ -484,6 +544,14 @@ export function DynamicsTab({ user }: { user?: { userId?: number } | null }) {
                 {renderPost(latestLostItem)}
               </div>
             )}
+            <div className="break-inside-avoid mb-4">
+              <AISummaryCard
+                periodLabel={aiBundle.periodLabel}
+                summaryLine={aiBundle.cardSummaryLine}
+                chips={aiBundle.chips}
+                onClick={() => setShowAiSummary(true)}
+              />
+            </div>
             {filteredPosts.map(renderPost)}
           </div>
         )}

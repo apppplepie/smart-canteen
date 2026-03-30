@@ -35,6 +35,19 @@ export function CanteenOnlineTab({ user }: { user?: { userId?: number } | null }
   const [selectedMerchant, setSelectedMerchant] = useState<{ id: number; name: string; image?: string; rating?: number; time?: string; distance?: string } | null>(null);
   const [activeService, setActiveService] = useState<"feedback" | "lost" | "found" | null>(null);
 
+  // 从食堂圈 AI 小结「寻物/招领」跳转：由 DynamicsTab 写入 sessionStorage
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("canteenOnlineTarget");
+      if (!raw) return;
+      sessionStorage.removeItem("canteenOnlineTarget");
+      if (raw === "lost") setActiveService("lost");
+      else if (raw === "found") setActiveService("found");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // Initialize and update crowd levels
   useEffect(() => {
     const generateLevels = () => Array.from({ length: 20 }, () => Math.floor(Math.random() * 100));

@@ -106,7 +106,19 @@ export default function App() {
             className="flex-1 h-full"
           >
             {activeTab === "ordering" && <OrderingTab user={user} />}
-            {activeTab === "dynamics" && <DynamicsTab user={user} />}
+            {activeTab === "dynamics" && (
+              <DynamicsTab
+                user={user}
+                onNavigateToOnlineService={(section) => {
+                  try {
+                    sessionStorage.setItem("canteenOnlineTarget", section);
+                  } catch {
+                    /* ignore */
+                  }
+                  setActiveTab("online");
+                }}
+              />
+            )}
             {activeTab === "assistant" && !user && (
               <div className="h-full flex flex-col items-center justify-center gap-6 px-8 bg-gray-50">
                 <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg" style={{ backgroundColor: THEME.colors.primary }}>

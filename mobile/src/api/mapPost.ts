@@ -68,5 +68,8 @@ export function postToSharedPost(post: PostDto, vendorName?: string, baseUrl?: s
     dishName: undefined,
     tags: tags.length > 0 ? tags : undefined,
     rating: post.rating != null && post.rating >= 1 && post.rating <= 5 ? post.rating : undefined,
+    postType: post.postType,
+    status: post.status,
+    reply: post.replyContent != null && post.replyContent.trim() !== "" ? post.replyContent : undefined,
   };
 }

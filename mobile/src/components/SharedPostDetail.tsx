@@ -23,6 +23,8 @@ export interface SharedPost {
   type?: string;
   status?: string;
   reply?: string;
+  /** 来自 PostDto，用于筛选动态/反馈等 */
+  postType?: string;
   location?: string;
   isFound?: boolean;
   isReturned?: boolean;
@@ -217,6 +219,13 @@ export function SharedPostDetail({ post, onMerchantClick, currentUserId, childre
         )}
 
         <p className="text-gray-800 text-lg leading-relaxed mb-4">{post.content}</p>
+
+        {post.reply != null && post.reply.trim() !== "" && (
+          <div className="mb-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
+            <p className="text-xs font-bold text-emerald-700 mb-1.5">官方回复</p>
+            <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{post.reply}</p>
+          </div>
+        )}
 
         {children}
 

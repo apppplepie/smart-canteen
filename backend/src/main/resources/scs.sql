@@ -490,4 +490,91 @@ CREATE TABLE `post_likes` (
   CONSTRAINT `fk_post_likes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='帖子点赞';
 
+-- ----------------------------
+-- 食堂日快照（经营/内容/词云等聚合结果；由后续定时任务写入，当前不与业务表联动）
+-- ----------------------------
+DROP TABLE IF EXISTS `canteen_daily_snapshots`;
+CREATE TABLE `canteen_daily_snapshots` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `snapshot_date` date NOT NULL COMMENT '自然日',
+  `scope_type` varchar(32) NOT NULL DEFAULT 'global' COMMENT 'global | vendor | campus',
+  `scope_id` bigint NOT NULL DEFAULT 0 COMMENT '全局用 0',
+  `total_orders` int NULL DEFAULT NULL,
+  `total_revenue` decimal(14,2) NULL DEFAULT NULL,
+  `total_items_sold` int NULL DEFAULT NULL,
+  `distinct_diners` int NULL DEFAULT NULL,
+  `guest_orders` int NULL DEFAULT NULL,
+  `avg_order_amount` decimal(10,2) NULL DEFAULT NULL,
+  `top_menu_items_json` json NULL COMMENT '销冠菜品 Top N',
+  `top_vendors_json` json NULL COMMENT '窗口排行',
+  `menu_catalog_json` json NULL COMMENT '当日在售菜单快照',
+  `hourly_orders_json` json NULL COMMENT '按小时订单量',
+  `reviews_new_count` int NULL DEFAULT NULL,
+  `reviews_avg_rating_that_day` decimal(3,2) NULL DEFAULT NULL,
+  `vendors_rating_leaderboard_json` json NULL COMMENT '红黑榜素材等',
+  `posts_dynamics_count` int NULL DEFAULT NULL,
+  `posts_feedback_count` int NULL DEFAULT NULL,
+  `posts_feedback_by_type_json` json NULL,
+  `post_comments_count` int NULL DEFAULT NULL,
+  `post_likes_count` int NULL DEFAULT NULL,
+  `hot_posts_json` json NULL,
+  `wordcloud_combined_json` json NULL COMMENT '词云 [{term,weight,count}]',
+  `wordcloud_version` varchar(32) NULL DEFAULT NULL,
+  `queue_tickets_issued` int NULL DEFAULT NULL,
+  `queue_by_vendor_json` json NULL,
+  `ai_conversations_new` int NULL DEFAULT NULL,
+  `ai_messages_count` int NULL DEFAULT NULL,
+  `nutrition_logs_count` int NULL DEFAULT NULL,
+  `nutrition_totals_json` json NULL,
+  `test_reports_new` int NULL DEFAULT NULL,
+  `stock_movements_count` int NULL DEFAULT NULL,
+  `computed_at` datetime NULL DEFAULT NULL,
+  `data_version` int NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_canteen_snapshot_scope_day` (`snapshot_date`,`scope_type`,`scope_id`),
+  KEY `idx_canteen_snapshot_date` (`snapshot_date` DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='食堂日统计快照（预留，非业务表实时计算）';
+
+-- ----------------------------
+-- AI 周期分析报告（周报食安扫描等；由后续任务/AI 写入，当前不与发帖聚合联动）
+-- ----------------------------
+DROP TABLE IF EXISTS `ai_period_reports`;
+CREATE TABLE `ai_period_reports` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `report_type` varchar(64) NOT NULL COMMENT 'weekly_posts_digest | food_safety_scan 等',
+  `period_type` varchar(32) NOT NULL DEFAULT 'weekly' COMMENT 'daily | weekly | monthly | adhoc',
+  `period_start` date NOT NULL,
+  `period_end` date NOT NULL,
+  `scope_type` varchar(32) NOT NULL DEFAULT 'global',
+  `scope_id` bigint NOT NULL DEFAULT 0,
+  `title` varchar(256) NULL DEFAULT NULL,
+  `executive_summary` text NULL,
+  `full_analysis_markdown` mediumtext NULL,
+  `structured_payload_json` json NULL COMMENT '风险、建议、引用帖 id 等',
+  `input_stats_json` json NULL,
+  `source_post_ids_json` json NULL,
+  `model_name` varchar(64) NULL DEFAULT NULL,
+  `prompt_version` varchar(64) NULL DEFAULT NULL,
+  `generation_status` varchar(32) NOT NULL DEFAULT 'success',
+  `error_message` text NULL,
+  `generated_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `notify_status` varchar(32) NOT NULL DEFAULT 'none',
+  `notify_channels_json` json NULL,
+  `notify_sent_at` datetime NULL DEFAULT NULL,
+  `acknowledged_by_user_id` bigint NULL DEFAULT NULL,
+  `acknowledged_at` datetime NULL DEFAULT NULL,
+  `visibility` varchar(32) NOT NULL DEFAULT 'admin_only',
+  `pii_redacted` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_ai_report_period` (`report_type`,`period_start`,`period_end`,`scope_type`,`scope_id`),
+  KEY `idx_ai_report_generated` (`generated_at` DESC),
+  CONSTRAINT `fk_ai_report_ack_user` FOREIGN KEY (`acknowledged_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI 周期分析快照（预留）';
+
+-- 手工试接口示例（按需取消注释执行；需库内已有 users.id=1 时 AI 报告才可带 ack 外键，可省略 acknowledged 字段）
+-- INSERT INTO `canteen_daily_snapshots` (`snapshot_date`,`scope_type`,`scope_id`,`total_orders`,`total_revenue`,`computed_at`,`data_version`)
+-- VALUES (CURDATE(),'global',0,0,0.00,NOW(),1);
+-- INSERT INTO `ai_period_reports` (`report_type`,`period_type`,`period_start`,`period_end`,`scope_type`,`scope_id`,`title`,`executive_summary`,`generation_status`,`visibility`)
+-- VALUES ('weekly_posts_digest','weekly',CURDATE() - INTERVAL 7 DAY,CURDATE(),'global',0,'占位周报','暂无真实聚合，仅占位。','success','admin_only');
+
 SET FOREIGN_KEY_CHECKS = 1;
