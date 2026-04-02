@@ -38,6 +38,11 @@ export interface AISummaryDetailContent {
   hotPosts: SharedPost[];
   redMerchants: AISummaryMerchant[];
   officialReplied: AISummaryOfficialItem[];
+  /** 向量检索召回的关联帖（已与「本周热帖」去重） */
+  ragHits?: { post: SharedPost; score: number }[];
+  ragNote?: string;
+  /** 实际用于检索的查询摘要（截断展示） */
+  ragQueryHint?: string;
 }
 
 interface AISummaryDetailProps {
@@ -70,6 +75,9 @@ export function AISummaryDetail({
     hotPosts,
     redMerchants,
     officialReplied,
+    ragHits,
+    ragNote,
+    ragQueryHint,
   } = content;
 
   return (
@@ -165,6 +173,44 @@ export function AISummaryDetail({
             </div>
           )}
         </section>
+
+        {ragHits != null && ragHits.length > 0 && (
+          <section className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 border-violet-100">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-full bg-violet-50 flex items-center justify-center text-violet-600">
+                <Search size={16} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-bold text-gray-900 text-lg">检索增强 · 关联讨论</h2>
+                <p className="text-xs text-gray-400">与本周主题语义相近的帖子（可含本周以外的历史帖）</p>
+              </div>
+            </div>
+            {ragNote != null && ragNote.trim() !== "" && (
+              <p className="text-xs text-gray-500 mb-3 leading-relaxed">{ragNote}</p>
+            )}
+            {ragQueryHint != null && ragQueryHint.trim() !== "" && (
+              <p className="text-[11px] text-gray-400 mb-3 line-clamp-2">
+                <span className="font-semibold text-gray-500">检索查询摘要：</span>
+                {ragQueryHint}
+              </p>
+            )}
+            <div className="space-y-3">
+              {ragHits.map(({ post, score }) => (
+                <button
+                  key={`rag-${String(post.id)}`}
+                  type="button"
+                  onClick={() => onPostClick(post)}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-violet-50/50 cursor-pointer transition-colors border border-violet-100/60 text-left gap-2"
+                >
+                  <p className="text-sm text-gray-800 font-medium line-clamp-2 flex-1 min-w-0">{postTitleLine(post)}</p>
+                  <span className="text-[10px] font-mono text-violet-600/80 shrink-0 tabular-nums">
+                    {score.toFixed(4)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 mb-4">

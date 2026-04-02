@@ -577,4 +577,20 @@ CREATE TABLE `ai_period_reports` (
 -- INSERT INTO `ai_period_reports` (`report_type`,`period_type`,`period_start`,`period_end`,`scope_type`,`scope_id`,`title`,`executive_summary`,`generation_status`,`visibility`)
 -- VALUES ('weekly_posts_digest','weekly',CURDATE() - INTERVAL 7 DAY,CURDATE(),'global',0,'占位周报','暂无真实聚合，仅占位。','success','admin_only');
 
+-- ----------------------------
+-- Table structure for post_vector_index（演示用语义检索向量索引）
+-- ----------------------------
+DROP TABLE IF EXISTS `post_vector_index`;
+CREATE TABLE `post_vector_index` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `post_id` bigint NOT NULL,
+  `source_text` text NULL,
+  `embedding_json` longtext NULL,
+  `model_name` varchar(64) DEFAULT 'demo-hash-embedding-v1',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_post_vector_post_id` (`post_id`),
+  CONSTRAINT `fk_post_vector_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='帖子向量索引';
+
 SET FOREIGN_KEY_CHECKS = 1;

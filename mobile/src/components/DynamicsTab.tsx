@@ -26,9 +26,17 @@ import { listAiPeriodReports, type AiReportListItem } from "../api/snapshots";
 import type { SharedPost } from "./SharedPostDetail";
 import type { Vendor } from "../api/types";
 import { dynamicsPostsFallbackMock, type DynamicsPost } from "../mocks/dynamicsPosts";
+import { fetchMockWeeklyHotPosts } from "../mocks/weeklyHotPostsDemo";
 import { AISummaryCard } from "./AISummaryCard";
 import { AISummaryDetail } from "./AISummaryDetail";
-import { buildAiSummaryBundle, getRollingWeekRange } from "../lib/aiSummaryBuild";
+import {
+  buildAiSummaryBundle,
+  buildWeeklyRagQuery,
+  getRollingWeekRange,
+  mergeVectorHitsWithLocalPosts,
+} from "../lib/aiSummaryBuild";
+import { searchPostsByVector } from "../api/postVectorSearch";
+import type { PostVectorSearchHit } from "../api/postVectorSearch";
 
 /** 从历史订单解析出的最近一单菜品，用于快速发布卡片（仅未评价订单） */
 type HistoryDishItem = {
@@ -57,10 +65,14 @@ export function DynamicsTab({
   const [loading, setLoading] = useState(true);
   const [showAiSummary, setShowAiSummary] = useState(false);
   const [weeklyAiReport, setWeeklyAiReport] = useState<AiReportListItem | null>(null);
+  const [vectorRawHits, setVectorRawHits] = useState<PostVectorSearchHit[]>([]);
+  const [ragQueryUsed, setRagQueryUsed] = useState("");
   const [rating, setRating] = useState(0);
   const [submittingRating, setSubmittingRating] = useState(false);
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [historyDish, setHistoryDish] = useState<HistoryDishItem | null>(null);
+  /** 演示：`VITE_DEMO_MOCK_HOT_POSTS` 或 `VITE_DEMO_MOCK_AI` 为 true 时填充「本周热帖」，并并入 RAG 检索链 */
+  const [demoHotPostsOverride, setDemoHotPostsOverride] = useState<SharedPost[] | null>(null);
 
   const baseUrl =
     (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "") ||
@@ -104,9 +116,73 @@ export function DynamicsTab({
     };
   }, [apiBase]);
 
+  const demoHotPostsEnabled =
+    import.meta.env.VITE_DEMO_MOCK_HOT_POSTS === "true" ||
+    import.meta.env.VITE_DEMO_MOCK_AI === "true";
+
+  useEffect(() => {
+    if (!demoHotPostsEnabled) {
+      setDemoHotPostsOverride(null);
+      return;
+    }
+    let cancelled = false;
+    fetchMockWeeklyHotPosts().then((list) => {
+      if (!cancelled) setDemoHotPostsOverride(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [demoHotPostsEnabled]);
+
+  /** 演示热帖也参与检索查询与向量命中合并，避免 RAG 与「本周热帖」脱节 */
+  const postsForRagPipeline = useMemo(() => {
+    const extra = demoHotPostsOverride;
+    if (!extra?.length) return posts;
+    const seen = new Set(posts.map((p) => String(p.id)));
+    return [...posts, ...extra.filter((p) => !seen.has(String(p.id)))];
+  }, [posts, demoHotPostsOverride]);
+
+  const ragQuery = useMemo(() => {
+    const week = getRollingWeekRange();
+    return buildWeeklyRagQuery(postsForRagPipeline, week, weeklyAiReport);
+  }, [postsForRagPipeline, weeklyAiReport]);
+
+  useEffect(() => {
+    if (!apiBase || !ragQuery.trim()) {
+      setVectorRawHits([]);
+      setRagQueryUsed("");
+      return;
+    }
+    let cancelled = false;
+    setRagQueryUsed(ragQuery.trim());
+    setVectorRawHits([]);
+    searchPostsByVector(ragQuery, 8).then((res) => {
+      if (!cancelled) {
+        setVectorRawHits(res?.results ?? []);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, ragQuery]);
+
+  const ragMerged = useMemo(
+    () => mergeVectorHitsWithLocalPosts(vectorRawHits, postsForRagPipeline),
+    [vectorRawHits, postsForRagPipeline],
+  );
+
   const aiBundle = useMemo(
-    () => buildAiSummaryBundle(posts, vendors, weeklyAiReport, getRollingWeekRange()),
-    [posts, vendors, weeklyAiReport],
+    () =>
+      buildAiSummaryBundle(
+        posts,
+        vendors,
+        weeklyAiReport,
+        getRollingWeekRange(),
+        ragMerged,
+        ragQueryUsed,
+        demoHotPostsOverride,
+      ),
+    [posts, vendors, weeklyAiReport, ragMerged, ragQueryUsed, demoHotPostsOverride],
   );
 
   const fetchLatestLost = React.useCallback(async () => {

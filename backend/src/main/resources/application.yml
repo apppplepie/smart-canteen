@@ -5,6 +5,14 @@ server:
 # 生产在容器内用环境变量 SCS_IMAGES_DIR（见 Dockerfile / compose）；本地未设置时默认仓库根目录下的 images（自 backend 目录启动用 ../images）
 scs:
   images-dir: ${SCS_IMAGES_DIR:../images}
+  vector:
+    embedding:
+      provider: ai-service
+      model: text-embedding-3-large
+      ai-service-url: http://localhost:8000/api/embeddings
+      openai:
+        base-url: https://api.openai.com
+        api-key: ${OPENAI_API_KEY:}
 
 # AI 服务（FastAPI）地址，供 /api/ai/chat 转调
 ai:

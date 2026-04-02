@@ -1,5 +1,6 @@
 import type { Vendor } from "../api/types";
 import type { AiReportListItem } from "../api/snapshots";
+import type { PostVectorSearchHit } from "../api/postVectorSearch";
 import type { SharedPost } from "../components/SharedPostDetail";
 import type {
   AISummaryDetailContent,
@@ -76,6 +77,95 @@ const FALLBACK_TOPICS: AISummaryTopic[] = [
 const FALLBACK_EMOTION =
   "整体讨论偏中性偏正面；若样本较少，结论仅供参考，欢迎多发帖交流。";
 
+const RAG_AVATAR = "https://api.dicebear.com/7.x/avataaars/svg?seed=rag";
+
+function firstLineFromPost(p: SharedPost): string {
+  const t = (p.content ?? "").trim();
+  return (t.split(/\n+/)[0] ?? "").slice(0, 96).trim();
+}
+
+/**
+ * 用本周热帖/反馈与（若有）周期报告话题拼检索查询，供向量接口召回关联帖。
+ */
+export function buildWeeklyRagQuery(
+  posts: SharedPost[],
+  week: WeekRange,
+  weeklyReport: AiReportListItem | null,
+): string {
+  const dynamicsInWeek = posts.filter((p) => isDynamicsPost(p) && postInWeek(p, week.start, week.end));
+  const feedbackInWeek = posts.filter((p) => p.postType === "feedback" && postInWeek(p, week.start, week.end));
+  const hot = [...dynamicsInWeek]
+    .sort((a, b) => (b.likes ?? 0) + (b.comments ?? 0) - ((a.likes ?? 0) + (a.comments ?? 0)))
+    .slice(0, 3);
+  const parts: string[] = [];
+  for (const p of hot) {
+    const line = firstLineFromPost(p);
+    if (line) {
+      parts.push(line);
+    }
+  }
+  for (const p of feedbackInWeek.slice(0, 2)) {
+    const line = firstLineFromPost(p);
+    if (line) {
+      parts.push(line);
+    }
+  }
+  const parsed = parseAiStructured(weeklyReport?.structuredPayloadJson);
+  for (const t of parsed.topics.slice(0, 2)) {
+    const x = t.text?.trim();
+    if (x) {
+      parts.push(x.slice(0, 120));
+    }
+  }
+  if (parts.length === 0) {
+    return "食堂 就餐 排队 口味 卫生 反馈 动态";
+  }
+  return parts.join(" ").slice(0, 280);
+}
+
+/** 将向量检索结果与本地已拉取的帖子合并，便于展示完整卡片；未在列表中的帖用摘要构造占位卡片。 */
+export function mergeVectorHitsWithLocalPosts(
+  hits: PostVectorSearchHit[],
+  localPosts: SharedPost[],
+): { post: SharedPost; score: number }[] {
+  const byId = new Map<number, SharedPost>();
+  for (const p of localPosts) {
+    const id = Number(p.id);
+    if (!Number.isNaN(id)) {
+      byId.set(id, p);
+    }
+  }
+  const out: { post: SharedPost; score: number }[] = [];
+  const seen = new Set<number>();
+  for (const h of hits) {
+    const pid = h.postId;
+    if (!pid || Number.isNaN(pid) || seen.has(pid)) {
+      continue;
+    }
+    seen.add(pid);
+    const score = h.score ?? 0;
+    const existing = byId.get(pid);
+    if (existing) {
+      out.push({ post: existing, score });
+      continue;
+    }
+    const title = (h.title ?? "").trim();
+    const content = (h.content ?? "").trim();
+    const text = title ? `${title}\n${content}` : content;
+    out.push({
+      post: {
+        id: pid,
+        user: { name: "相关帖", avatar: RAG_AVATAR },
+        content: text || "（无正文摘要）",
+        likes: 0,
+        comments: 0,
+      },
+      score,
+    });
+  }
+  return out;
+}
+
 export interface AiSummaryBundle {
   periodLabel: string;
   detail: AISummaryDetailContent;
@@ -88,15 +178,31 @@ export function buildAiSummaryBundle(
   vendors: Vendor[],
   weeklyReport: AiReportListItem | null,
   week: WeekRange,
+  ragHits?: { post: SharedPost; score: number }[],
+  ragQueryUsed?: string,
+  /** 演示用：非空时覆盖本地统计得到的「本周热帖」 */
+  hotPostsOverride?: SharedPost[] | null,
 ): AiSummaryBundle {
   const { start, end, periodLabel } = week;
 
   const dynamicsInWeek = posts.filter((p) => isDynamicsPost(p) && postInWeek(p, start, end));
   const feedbackInWeek = posts.filter((p) => p.postType === "feedback" && postInWeek(p, start, end));
+  const dynamicsAll = posts.filter((p) => isDynamicsPost(p));
 
-  const hotPosts = [...dynamicsInWeek]
-    .sort((a, b) => (b.likes ?? 0) + (b.comments ?? 0) - ((a.likes ?? 0) + (a.comments ?? 0)))
-    .slice(0, 5);
+  const sortByEngagement = (a: SharedPost, b: SharedPost) =>
+    (b.likes ?? 0) + (b.comments ?? 0) - ((a.likes ?? 0) + (a.comments ?? 0));
+
+  let hotPosts: SharedPost[];
+  let hotPostsRecentFallback = false;
+  if (hotPostsOverride != null && hotPostsOverride.length > 0) {
+    hotPosts = hotPostsOverride.slice(0, 5);
+  } else {
+    hotPosts = [...dynamicsInWeek].sort(sortByEngagement).slice(0, 5);
+    if (hotPosts.length === 0 && dynamicsAll.length > 0) {
+      hotPosts = [...dynamicsAll].sort(sortByEngagement).slice(0, 5);
+      hotPostsRecentFallback = true;
+    }
+  }
 
   const officialReplied: AISummaryOfficialItem[] = feedbackInWeek
     .filter((p) => {
@@ -127,7 +233,16 @@ export function buildAiSummaryBundle(
     weeklyReport?.executiveSummary?.split(/\n/).slice(1).join(" ").trim() ||
     FALLBACK_EMOTION;
 
-  const statsFooter = `基于本周 ${dynamicsInWeek.length} 条动态 / ${feedbackInWeek.length} 条反馈生成`;
+  let statsFooter = `基于本周 ${dynamicsInWeek.length} 条动态 / ${feedbackInWeek.length} 条反馈生成`;
+  if (hotPostsRecentFallback) {
+    statsFooter += ` · 本周窗口内无符合条件的动态，热帖展示为近期高互动内容`;
+  }
+  const hotIds = new Set(hotPosts.map((p) => String(p.id)));
+  const ragFiltered =
+    ragHits?.filter((h) => !hotIds.has(String(h.post.id))).slice(0, 6) ?? [];
+  if (ragFiltered.length > 0) {
+    statsFooter += ` · 已用语义检索补充 ${ragFiltered.length} 条关联帖`;
+  }
 
   const detail: AISummaryDetailContent = {
     periodTitle: `本周食堂圈 · AI 小结 (${periodLabel})`,
@@ -137,12 +252,19 @@ export function buildAiSummaryBundle(
     hotPosts,
     redMerchants,
     officialReplied,
+    ragHits: ragFiltered.length > 0 ? ragFiltered : undefined,
+    ragNote:
+      ragFiltered.length > 0 && ragQueryUsed?.trim()
+        ? `以下帖子由帖子向量检索接口召回（查询由本周热帖/反馈与报告话题拼接而成），相似度分数仅供参考。`
+        : undefined,
+    ragQueryHint: ragFiltered.length > 0 && ragQueryUsed?.trim() ? ragQueryUsed.trim().slice(0, 120) : undefined,
   };
 
   const chips: string[] = [];
   if (hotPosts.length > 0) chips.push("热帖");
   if (officialReplied.length > 0) chips.push("已回复");
   if (redMerchants.length > 0) chips.push("红榜");
+  if (ragFiltered.length > 0) chips.push("检索增强");
 
   const apiFirstLine = weeklyReport?.executiveSummary?.trim().split(/\n/)[0]?.trim();
   const cardSummaryLine =
