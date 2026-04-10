@@ -15,10 +15,22 @@ export interface PostVectorSearchResponse {
   runtime?: Record<string, unknown>;
 }
 
+/** 默认向量检索超时（毫秒）；演示场景避免长时间挂起等后端嵌入 */
+export const DEFAULT_VECTOR_SEARCH_TIMEOUT_MS = 5000;
+
+export interface SearchPostsByVectorOptions {
+  /** 超时后中止请求，返回 null（由调用方决定是否走前端 mock） */
+  timeoutMs?: number;
+}
+
 /**
  * 帖子语义检索（Spring Boot /api/vector/posts/search），供周报 RAG 等场景拉取关联帖。
  */
-export async function searchPostsByVector(query: string, topK = 8): Promise<PostVectorSearchResponse | null> {
+export async function searchPostsByVector(
+  query: string,
+  topK = 8,
+  opts?: SearchPostsByVectorOptions,
+): Promise<PostVectorSearchResponse | null> {
   const base = getBaseUrl();
   if (!base || !query.trim()) {
     return null;
@@ -28,8 +40,11 @@ export async function searchPostsByVector(query: string, topK = 8): Promise<Post
     topK: String(Math.min(20, Math.max(1, topK))),
   });
   const url = `${base.replace(/\/$/, "")}/api/vector/posts/search?${q.toString()}`;
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_VECTOR_SEARCH_TIMEOUT_MS;
+  const ac = new AbortController();
+  const tid = window.setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: ac.signal });
     if (!res.ok) {
       return null;
     }
@@ -52,5 +67,7 @@ export async function searchPostsByVector(query: string, topK = 8): Promise<Post
     };
   } catch {
     return null;
+  } finally {
+    window.clearTimeout(tid);
   }
 }

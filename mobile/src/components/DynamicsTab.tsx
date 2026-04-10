@@ -27,6 +27,7 @@ import type { SharedPost } from "./SharedPostDetail";
 import type { Vendor } from "../api/types";
 import { dynamicsPostsFallbackMock, type DynamicsPost } from "../mocks/dynamicsPosts";
 import { fetchMockWeeklyHotPosts } from "../mocks/weeklyHotPostsDemo";
+import { MOCK_RAG_VECTOR_HITS_DEMO } from "../mocks/ragVectorHitsDemo";
 import { AISummaryCard } from "./AISummaryCard";
 import { AISummaryDetail } from "./AISummaryDetail";
 import {
@@ -34,9 +35,14 @@ import {
   buildWeeklyRagQuery,
   getRollingWeekRange,
   mergeVectorHitsWithLocalPosts,
+  mergeVectorSearchHitLists,
+  RAG_BROAD_FALLBACK_QUERY,
 } from "../lib/aiSummaryBuild";
-import { searchPostsByVector } from "../api/postVectorSearch";
-import type { PostVectorSearchHit } from "../api/postVectorSearch";
+import {
+  searchPostsByVector,
+  DEFAULT_VECTOR_SEARCH_TIMEOUT_MS,
+  type PostVectorSearchHit,
+} from "../api/postVectorSearch";
 
 /** 从历史订单解析出的最近一单菜品，用于快速发布卡片（仅未评价订单） */
 type HistoryDishItem = {
@@ -148,19 +154,43 @@ export function DynamicsTab({
   }, [postsForRagPipeline, weeklyAiReport]);
 
   useEffect(() => {
-    if (!apiBase || !ragQuery.trim()) {
+    if (!ragQuery.trim()) {
       setVectorRawHits([]);
       setRagQueryUsed("");
       return;
     }
+    const q = ragQuery.trim();
+    const sameAsFallback = q === RAG_BROAD_FALLBACK_QUERY;
+
+    if (!apiBase) {
+      setVectorRawHits(MOCK_RAG_VECTOR_HITS_DEMO);
+      setRagQueryUsed(`${q} · 演示召回（未配置后端）`);
+      return;
+    }
+
     let cancelled = false;
-    setRagQueryUsed(ragQuery.trim());
     setVectorRawHits([]);
-    searchPostsByVector(ragQuery, 8).then((res) => {
-      if (!cancelled) {
-        setVectorRawHits(res?.results ?? []);
+    setRagQueryUsed(sameAsFallback ? `${q}（仅宽泛检索）` : `${q} · +全库宽泛词`);
+
+    const tmo = DEFAULT_VECTOR_SEARCH_TIMEOUT_MS;
+    (async () => {
+      const [primary, broad] = await Promise.all([
+        searchPostsByVector(q, 14, { timeoutMs: tmo }),
+        sameAsFallback ? Promise.resolve(null) : searchPostsByVector(RAG_BROAD_FALLBACK_QUERY, 14, { timeoutMs: tmo }),
+      ]);
+      if (cancelled) return;
+      const merged = sameAsFallback
+        ? (primary?.results ?? [])
+        : mergeVectorSearchHitLists(primary?.results ?? [], broad?.results ?? []);
+      if (!merged.length) {
+        if (cancelled) return;
+        setRagQueryUsed(`${q} · 演示召回（接口无结果或超时）`);
+        setVectorRawHits(MOCK_RAG_VECTOR_HITS_DEMO);
+        return;
       }
-    });
+      if (!cancelled) setVectorRawHits(merged);
+    })();
+
     return () => {
       cancelled = true;
     };
@@ -307,7 +337,7 @@ export function DynamicsTab({
           )}
         </div>
       )}
-      {!post.image && (
+      {!post.image && (hasRating || !isLost) && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
           {hasRating && (
             <span className="flex items-center gap-1 text-amber-600 text-xs font-medium">
@@ -315,18 +345,18 @@ export function DynamicsTab({
               {post.rating} 分
             </span>
           )}
-          <div className="flex items-center gap-2 ml-auto text-gray-500 text-xs">
-            {!isLost && (
+          {!isLost && (
+            <div className="flex items-center gap-2 ml-auto text-gray-500 text-xs">
               <span className="flex items-center gap-0.5">
                 <Heart size={12} />
                 {post.likes ?? 0}
               </span>
-            )}
-            <span className="flex items-center gap-0.5">
-              <MessageCircle size={12} />
-              {post.comments ?? 0}
-            </span>
-          </div>
+              <span className="flex items-center gap-0.5">
+                <MessageCircle size={12} />
+                {post.comments ?? 0}
+              </span>
+            </div>
+          )}
         </div>
       )}
       <div className="p-4">
@@ -360,25 +390,18 @@ export function DynamicsTab({
               {post.user?.name ?? "用户"}
             </span>
           </div>
-          <div className="flex items-center gap-3 text-gray-400">
-            {typeof post.id !== "string" || !String(post.id).startsWith("lost-") ? (
-              <>
-                <span className="flex items-center gap-0.5">
-                  <Heart size={14} />
-                  <span className="text-xs">{post.likes ?? 0}</span>
-                </span>
-                <span className="flex items-center gap-0.5">
-                  <MessageCircle size={14} />
-                  <span className="text-xs">{post.comments ?? 0}</span>
-                </span>
-              </>
-            ) : (
+          {!isLost && (
+            <div className="flex items-center gap-3 text-gray-400">
+              <span className="flex items-center gap-0.5">
+                <Heart size={14} />
+                <span className="text-xs">{post.likes ?? 0}</span>
+              </span>
               <span className="flex items-center gap-0.5">
                 <MessageCircle size={14} />
                 <span className="text-xs">{post.comments ?? 0}</span>
               </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

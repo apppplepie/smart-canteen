@@ -38,7 +38,7 @@ export interface AISummaryDetailContent {
   hotPosts: SharedPost[];
   redMerchants: AISummaryMerchant[];
   officialReplied: AISummaryOfficialItem[];
-  /** 向量检索召回的关联帖（已与「本周热帖」去重） */
+  /** 向量检索召回的关联帖（已与热帖精选去重） */
   ragHits?: { post: SharedPost; score: number }[];
   ragNote?: string;
   /** 实际用于检索的查询摘要（截断展示） */
@@ -144,12 +144,12 @@ export function AISummaryDetail({
             <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
               <Flame size={16} />
             </div>
-            <h2 className="font-bold text-gray-900 text-lg">本周热帖</h2>
-            <span className="text-xs text-gray-400 ml-auto">互动量优先</span>
+            <h2 className="font-bold text-gray-900 text-lg">热帖精选</h2>
+            <span className="text-xs text-gray-400 ml-auto">全时段 · 互动最高 1 条</span>
           </div>
 
           {hotPosts.length === 0 ? (
-            <p className="text-sm text-gray-500 py-2">本周暂无明火热帖。</p>
+            <p className="text-sm text-gray-500 py-2">暂无明火热帖（当前列表无动态）。</p>
           ) : (
             <div className="space-y-3">
               {hotPosts.map((post) => (
@@ -182,7 +182,9 @@ export function AISummaryDetail({
               </div>
               <div className="min-w-0">
                 <h2 className="font-bold text-gray-900 text-lg">检索增强 · 关联讨论</h2>
-                <p className="text-xs text-gray-400">与本周主题语义相近的帖子（可含本周以外的历史帖）</p>
+                <p className="text-xs text-gray-400">
+                  全库语义相近帖（含动态与反馈/建议；不限热度，可含历史帖）
+                </p>
               </div>
             </div>
             {ragNote != null && ragNote.trim() !== "" && (

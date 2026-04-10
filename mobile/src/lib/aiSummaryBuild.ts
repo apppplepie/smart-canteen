@@ -9,6 +9,37 @@ import type {
   AISummaryTopic,
 } from "../components/AISummaryDetail";
 
+/** 与帖子热度无关：用于第二次向量请求，从全库索引里尽量捞出分散命中（需后端已 rebuild） */
+export const RAG_BROAD_FALLBACK_QUERY =
+  "食堂 反馈 建议 意见 投诉 就餐 口味 卫生 排队 窗口 动态";
+
+function sortByRecencyDesc(posts: SharedPost[]): SharedPost[] {
+  return [...posts].sort((a, b) => {
+    const ta = a.postTime ? new Date(a.postTime).getTime() : Number.NEGATIVE_INFINITY;
+    const tb = b.postTime ? new Date(b.postTime).getTime() : Number.NEGATIVE_INFINITY;
+    return tb - ta;
+  });
+}
+
+/** 合并两次向量检索结果：同 postId 保留较高 score，再按分数排序 */
+export function mergeVectorSearchHitLists(a: PostVectorSearchHit[], b: PostVectorSearchHit[]): PostVectorSearchHit[] {
+  const byId = new Map<number, PostVectorSearchHit>();
+  const ingest = (list: PostVectorSearchHit[]) => {
+    for (const h of list) {
+      const id = h.postId;
+      if (id == null || Number.isNaN(Number(id))) continue;
+      const prev = byId.get(id);
+      const sc = h.score ?? 0;
+      if (!prev || (prev.score ?? 0) < sc) {
+        byId.set(id, h);
+      }
+    }
+  };
+  ingest(a);
+  ingest(b);
+  return [...byId.values()].sort((x, y) => (y.score ?? 0) - (x.score ?? 0));
+}
+
 export interface WeekRange {
   start: Date;
   end: Date;
@@ -85,42 +116,35 @@ function firstLineFromPost(p: SharedPost): string {
 }
 
 /**
- * 用本周热帖/反馈与（若有）周期报告话题拼检索查询，供向量接口召回关联帖。
+ * 拼主检索 query：优先「反馈/建议」正文与动态正文（按发帖时间新→旧，不按互动），再拼周报话题。
+ * 前缀领域词帮助在样本极少、哈希嵌入场景下仍能向量化出可区分信号。
  */
 export function buildWeeklyRagQuery(
   posts: SharedPost[],
-  week: WeekRange,
+  _week: WeekRange,
   weeklyReport: AiReportListItem | null,
 ): string {
-  const dynamicsInWeek = posts.filter((p) => isDynamicsPost(p) && postInWeek(p, week.start, week.end));
-  const feedbackInWeek = posts.filter((p) => p.postType === "feedback" && postInWeek(p, week.start, week.end));
-  const hot = [...dynamicsInWeek]
-    .sort((a, b) => (b.likes ?? 0) + (b.comments ?? 0) - ((a.likes ?? 0) + (a.comments ?? 0)))
-    .slice(0, 3);
+  const dynamicsAll = posts.filter((p) => isDynamicsPost(p));
+  const feedbackAll = posts.filter((p) => p.postType === "feedback");
   const parts: string[] = [];
-  for (const p of hot) {
+  for (const p of sortByRecencyDesc(feedbackAll).slice(0, 4)) {
     const line = firstLineFromPost(p);
-    if (line) {
-      parts.push(line);
-    }
+    if (line) parts.push(line);
   }
-  for (const p of feedbackInWeek.slice(0, 2)) {
+  for (const p of sortByRecencyDesc(dynamicsAll).slice(0, 2)) {
     const line = firstLineFromPost(p);
-    if (line) {
-      parts.push(line);
-    }
+    if (line) parts.push(line);
   }
   const parsed = parseAiStructured(weeklyReport?.structuredPayloadJson);
   for (const t of parsed.topics.slice(0, 2)) {
     const x = t.text?.trim();
-    if (x) {
-      parts.push(x.slice(0, 120));
-    }
+    if (x) parts.push(x.slice(0, 120));
   }
   if (parts.length === 0) {
-    return "食堂 就餐 排队 口味 卫生 反馈 动态";
+    return RAG_BROAD_FALLBACK_QUERY;
   }
-  return parts.join(" ").slice(0, 280);
+  const body = parts.join(" ").slice(0, 240);
+  return `食堂 反馈 建议 ${body}`.trim().slice(0, 280);
 }
 
 /** 将向量检索结果与本地已拉取的帖子合并，便于展示完整卡片；未在列表中的帖用摘要构造占位卡片。 */
@@ -152,13 +176,16 @@ export function mergeVectorHitsWithLocalPosts(
     const title = (h.title ?? "").trim();
     const content = (h.content ?? "").trim();
     const text = title ? `${title}\n${content}` : content;
+    const looksFeedback =
+      /\b反馈\b|建议|投诉|意见|窗口|卫生|排队/i.test(text) || /\bfeedback\b/i.test(text);
     out.push({
       post: {
         id: pid,
-        user: { name: "相关帖", avatar: RAG_AVATAR },
+        user: { name: looksFeedback ? "相关反馈" : "相关帖", avatar: RAG_AVATAR },
         content: text || "（无正文摘要）",
         likes: 0,
         comments: 0,
+        postType: looksFeedback ? "feedback" : undefined,
       },
       score,
     });
@@ -180,7 +207,7 @@ export function buildAiSummaryBundle(
   week: WeekRange,
   ragHits?: { post: SharedPost; score: number }[],
   ragQueryUsed?: string,
-  /** 演示用：非空时覆盖本地统计得到的「本周热帖」 */
+  /** 演示用：非空时覆盖本地统计得到的热帖（仍按互动取 1 条） */
   hotPostsOverride?: SharedPost[] | null,
 ): AiSummaryBundle {
   const { start, end, periodLabel } = week;
@@ -193,15 +220,10 @@ export function buildAiSummaryBundle(
     (b.likes ?? 0) + (b.comments ?? 0) - ((a.likes ?? 0) + (a.comments ?? 0));
 
   let hotPosts: SharedPost[];
-  let hotPostsRecentFallback = false;
   if (hotPostsOverride != null && hotPostsOverride.length > 0) {
-    hotPosts = hotPostsOverride.slice(0, 5);
+    hotPosts = [...hotPostsOverride].sort(sortByEngagement).slice(0, 1);
   } else {
-    hotPosts = [...dynamicsInWeek].sort(sortByEngagement).slice(0, 5);
-    if (hotPosts.length === 0 && dynamicsAll.length > 0) {
-      hotPosts = [...dynamicsAll].sort(sortByEngagement).slice(0, 5);
-      hotPostsRecentFallback = true;
-    }
+    hotPosts = [...dynamicsAll].sort(sortByEngagement).slice(0, 1);
   }
 
   const officialReplied: AISummaryOfficialItem[] = feedbackInWeek
@@ -233,13 +255,10 @@ export function buildAiSummaryBundle(
     weeklyReport?.executiveSummary?.split(/\n/).slice(1).join(" ").trim() ||
     FALLBACK_EMOTION;
 
-  let statsFooter = `基于本周 ${dynamicsInWeek.length} 条动态 / ${feedbackInWeek.length} 条反馈生成`;
-  if (hotPostsRecentFallback) {
-    statsFooter += ` · 本周窗口内无符合条件的动态，热帖展示为近期高互动内容`;
-  }
+  let statsFooter = `本周窗口内 ${dynamicsInWeek.length} 条动态 / ${feedbackInWeek.length} 条反馈；热帖为不限周期、当前列表中互动最高 1 条`;
   const hotIds = new Set(hotPosts.map((p) => String(p.id)));
   const ragFiltered =
-    ragHits?.filter((h) => !hotIds.has(String(h.post.id))).slice(0, 6) ?? [];
+    ragHits?.filter((h) => !hotIds.has(String(h.post.id))).slice(0, 8) ?? [];
   if (ragFiltered.length > 0) {
     statsFooter += ` · 已用语义检索补充 ${ragFiltered.length} 条关联帖`;
   }
@@ -255,7 +274,7 @@ export function buildAiSummaryBundle(
     ragHits: ragFiltered.length > 0 ? ragFiltered : undefined,
     ragNote:
       ragFiltered.length > 0 && ragQueryUsed?.trim()
-        ? `以下帖子由帖子向量检索接口召回（查询由本周热帖/反馈与报告话题拼接而成），相似度分数仅供参考。`
+        ? `以下帖子由帖子向量检索接口在全库索引上召回：主检索按反馈/动态正文与周报话题拼接（不按热度），并与全库宽泛词检索结果合并去重；相似度分数仅供参考。`
         : undefined,
     ragQueryHint: ragFiltered.length > 0 && ragQueryUsed?.trim() ? ragQueryUsed.trim().slice(0, 120) : undefined,
   };

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Service
 public class VendorReviewService {
@@ -57,25 +58,30 @@ public class VendorReviewService {
         if (entity.getOrderId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
-        Object[] orderIds = orderRepo.findUserAndVendorIdsById(entity.getOrderId()).orElse(null);
-        if (orderIds == null) {
+        final Long orderId = Objects.requireNonNull(entity.getOrderId());
+        final Long userId = entity.getUserId();
+        final Long vendorId = entity.getVendorId();
+
+        Object[] rawOrderIds = orderRepo.findUserAndVendorIdsById(orderId).orElse(null);
+        if (rawOrderIds == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        Long orderUserId = (Long) orderIds[0];
-        Long orderVendorId = (Long) orderIds[1];
-        if (entity.getUserId() == null || !entity.getUserId().equals(orderUserId)) {
+        Object[] orderIds = normalizeOrderOwnership(rawOrderIds);
+        Long orderUserId = toLong(orderIds[0]);
+        Long orderVendorId = toLong(orderIds[1]);
+        if (userId == null || !userId.equals(orderUserId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        if (entity.getVendorId() == null || !entity.getVendorId().equals(orderVendorId)) {
+        if (vendorId == null || !vendorId.equals(orderVendorId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
-        userRepo.findById(entity.getUserId()).ifPresentOrElse(entity::setUser, () -> {
+        userRepo.findById(userId).ifPresentOrElse(entity::setUser, () -> {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         });
-        vendorRepo.findById(entity.getVendorId()).ifPresentOrElse(entity::setVendor, () -> {
+        vendorRepo.findById(vendorId).ifPresentOrElse(entity::setVendor, () -> {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         });
-        orderRepo.findById(entity.getOrderId()).ifPresentOrElse(entity::setOrder, () -> {
+        orderRepo.findById(orderId).ifPresentOrElse(entity::setOrder, () -> {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         });
 
@@ -86,15 +92,15 @@ public class VendorReviewService {
             throw new ResponseStatusException(HttpStatus.CONFLICT);
         }
 
-        orderRepo.findById(entity.getOrderId()).ifPresent(o -> {
+        orderRepo.findById(orderId).ifPresent(o -> {
             o.setReviewedAt(LocalDateTime.now());
             orderRepo.save(o);
         });
 
         if (entity.getContent() != null && !entity.getContent().isBlank()) {
             Post post = new Post();
-            post.setUserId(entity.getUserId());
-            post.setVendorId(entity.getVendorId());
+            post.setUserId(userId);
+            post.setVendorId(vendorId);
             post.setVendorReviewId(saved.getId());
             post.setContent(entity.getContent().trim());
             post.setPostType("dynamics");
@@ -115,5 +121,25 @@ public class VendorReviewService {
                 saved.getRating(),
                 saved.getContent(),
                 saved.getCreatedAt());
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "invalid order ownership data");
+    }
+
+    private Object[] normalizeOrderOwnership(Object[] rawOrderIds) {
+        if (rawOrderIds.length >= 2) {
+            return rawOrderIds;
+        }
+        if (rawOrderIds.length == 1 && rawOrderIds[0] instanceof Object[] nested && nested.length >= 2) {
+            return nested;
+        }
+        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "invalid order ownership row");
     }
 }

@@ -29,6 +29,23 @@ function stripMarkdownForSpeech(s: string): string {
     .slice(0, 800);
 }
 
+function extractTtsPayload(raw: unknown): { audioBase64?: string; format?: string; provider?: string } | null {
+  let current = raw;
+  for (let i = 0; i < 4 && current && typeof current === 'object'; i += 1) {
+    const obj = current as {
+      data?: unknown;
+      audioBase64?: string;
+      format?: string;
+      provider?: string;
+    };
+    if (typeof obj.audioBase64 === 'string' && obj.audioBase64) {
+      return obj;
+    }
+    current = obj.data;
+  }
+  return null;
+}
+
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([
@@ -82,9 +99,11 @@ export function AIAssistant() {
         let j: {
           code?: number;
           message?: string;
-          data?: { audioBase64?: string; format?: string; provider?: string };
+          detail?: string;
+          data?: unknown;
           audioBase64?: string;
           format?: string;
+          provider?: string;
         } = {};
         try {
           j = raw ? JSON.parse(raw) : {};
@@ -94,11 +113,11 @@ export function AIAssistant() {
 
         const apiFail = !res.ok || (j.code !== undefined && j.code !== 0);
         if (apiFail) {
+          console.warn('[TTS] 接口失败', url, res.status, j?.message || j?.detail || raw);
           return false;
         }
 
-        const payload =
-          j.code === 0 && j.data != null ? j.data : (j as { audioBase64?: string; format?: string });
+        const payload = extractTtsPayload(j);
         const b64 = payload?.audioBase64;
         const format = payload?.format || 'mp3';
         if (b64 && typeof b64 === 'string') {
@@ -108,6 +127,7 @@ export function AIAssistant() {
           await audio.play();
           return true;
         }
+        console.warn('[TTS] 响应中未找到音频数据', url, raw);
         return false;
       };
 

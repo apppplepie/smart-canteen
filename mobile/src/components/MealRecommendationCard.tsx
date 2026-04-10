@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { MapPin, Star, Clock, ChevronRight, ShoppingBag } from "lucide-react";
 import { motion } from "motion/react";
-import { cn } from "../lib/utils";
+
+const MEAL_IMG_FALLBACK = "https://picsum.photos/seed/meal-fallback/400/300";
 
 interface MealRecommendationCardProps {
   merchantName: string;
@@ -23,6 +24,12 @@ export function MealRecommendationCard({
   locationLabel = "食堂",
   onOrder,
 }: MealRecommendationCardProps) {
+  const [imgSrc, setImgSrc] = useState(image);
+
+  useEffect(() => {
+    setImgSrc(image);
+  }, [image]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -31,10 +38,11 @@ export function MealRecommendationCard({
     >
       <div className="relative h-32 overflow-hidden">
         <img
-          src={image}
+          src={imgSrc}
           alt={merchantName}
           className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
+          onError={() => setImgSrc(MEAL_IMG_FALLBACK)}
         />
         <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1">
           <Clock size={10} />

@@ -20,8 +20,25 @@ import { cn } from "../lib/utils";
 import { THEME } from "../config/theme";
 import { aiAssistantSuggestionsMock } from "../mocks/aiAssistant";
 import { MealRecommendationCard } from "./MealRecommendationCard";
+import { getBaseUrl } from "../api/client";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+
+/** 将后端返回的相对路径菜品图拼成可请求的绝对 URL（与 mapPost / lostItem 一致） */
+function resolveMealCardImage(raw: string | undefined | null): string {
+  const s = (raw ?? "").trim();
+  const base = getBaseUrl().replace(/\/$/, "");
+  if (!s) {
+    return "https://picsum.photos/seed/meal-card/400/300";
+  }
+  if (/^https?:\/\//i.test(s)) {
+    return s;
+  }
+  if (!base) {
+    return s.startsWith("/") ? s : `/${s}`;
+  }
+  return s.startsWith("/") ? `${base}${s}` : `${base}/${s}`;
+}
 
 /** 餐品推荐卡片：由后端根据 AI 工具 recommend_meal_card + 数据库菜品组装 */
 export interface MealRecommendationCardPayload {
@@ -222,7 +239,6 @@ export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
         rawMeal &&
         rawMeal.merchantName &&
         rawMeal.dishName &&
-        rawMeal.image &&
         typeof rawMeal.rating === "number" &&
         rawMeal.time
           ? {
@@ -230,7 +246,7 @@ export function AIAssistantTab({ user }: { user?: AIAssistantUser }) {
               dishName: rawMeal.dishName,
               rating: rawMeal.rating,
               time: rawMeal.time,
-              image: rawMeal.image,
+              image: resolveMealCardImage(rawMeal.image),
               locationLabel: rawMeal.locationLabel,
               menuItemId: rawMeal.menuItemId,
             }
