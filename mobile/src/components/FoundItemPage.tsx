@@ -208,9 +208,14 @@ export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?:
       className="fixed inset-0 bg-gray-50 z-[100] flex flex-col"
     >
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
-      <div className="bg-white px-4 pt-6 pb-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <button onClick={handleBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-full">
-          <ChevronLeft size={24} />
+      <div className="bg-white px-4 pt-6 pb-3 flex items-center justify-between sticky top-0 z-10 shadow-sm border-b border-gray-100/80">
+        <button
+          type="button"
+          onClick={handleBack}
+          aria-label="返回"
+          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 border border-gray-200/80 text-gray-800 hover:bg-gray-200/80 active:scale-95 transition-all"
+        >
+          <ChevronLeft size={22} strokeWidth={2.25} />
         </button>
         {selectedPost ? (
           <span className="font-bold">招领详情</span>
@@ -243,18 +248,31 @@ export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?:
               exit={{ opacity: 0, y: 20 }}
               className="fixed inset-0 bg-white z-20 flex flex-col"
             >
-              <SharedPostDetail post={{ ...selectedPost, tags: ["失物招领"] }}>
-                <div className="bg-gray-50 rounded-2xl p-4 space-y-3 mt-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <MapPin size={16} className="text-blue-500" />
-                    <span>拾取地点：{selectedPost.location}</span>
+              <header className="shrink-0 flex items-center gap-2 px-3 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-gray-100 bg-white shadow-sm">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  aria-label="返回"
+                  className="shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 border border-gray-200/80 text-gray-800 hover:bg-gray-200/80 active:scale-95 transition-all"
+                >
+                  <ChevronLeft size={22} strokeWidth={2.25} />
+                </button>
+                <span className="font-bold text-gray-900 text-base">招领详情</span>
+              </header>
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <SharedPostDetail post={{ ...selectedPost, tags: ["失物招领"] }}>
+                  <div className="bg-gray-50 rounded-2xl p-4 space-y-3 mt-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <MapPin size={16} className="text-blue-500" />
+                      <span>拾取地点：{selectedPost.location}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Clock size={16} className="text-blue-500" />
+                      <span>拾取时间：{selectedPost.time}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Clock size={16} className="text-blue-500" />
-                    <span>拾取时间：{selectedPost.time}</span>
-                  </div>
-                </div>
-              </SharedPostDetail>
+                </SharedPostDetail>
+              </div>
             </motion.div>
           ) : activeTab === "发布" ? (
             <motion.div key="publish" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6 max-w-2xl mx-auto p-6">

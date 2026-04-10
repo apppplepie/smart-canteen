@@ -17,7 +17,17 @@ export async function createVendorReview(body: {
   rating: number;
   content?: string;
 }): Promise<VendorReviewDto> {
-  return apiPost<VendorReviewDto>("/api/vendor-reviews", body);
+  const content =
+    body.content != null && String(body.content).trim() !== ""
+      ? String(body.content).trim()
+      : undefined;
+  return apiPost<VendorReviewDto>("/api/vendor-reviews", {
+    userId: body.userId,
+    vendorId: body.vendorId,
+    orderId: body.orderId,
+    rating: body.rating,
+    ...(content !== undefined ? { content } : {}),
+  });
 }
 
 export async function listVendorReviewsByVendor(vendorId: number): Promise<VendorReviewDto[]> {

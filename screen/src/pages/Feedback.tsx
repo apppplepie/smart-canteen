@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { PageContainer } from '../components/common/PageContainer';
 import { motion } from 'motion/react';
 import { MessageSquare, Send, BarChart3, PieChart as PieChartIcon, CheckCircle2, Clock, TrendingUp, Users, Sparkles } from 'lucide-react';
@@ -225,7 +226,11 @@ export default function Feedback() {
                           </div>
                           <div className="flex-1 rounded-xl border bg-violet-500/10 border-violet-500/30 pl-4 pr-4 py-3">
                             <p className="text-xs font-bold mb-1.5 text-violet-400">AI建议</p>
-                            <p className="text-sm leading-relaxed text-slate-200">{item.aiSuggestion}</p>
+                            <div
+                              className="text-sm leading-relaxed text-slate-200 [&_p]:my-1.5 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_strong]:font-semibold [&_code]:bg-violet-950/60 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-950/80 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_a]:text-violet-300 [&_a]:underline hover:[&_a]:text-violet-200 [&_blockquote]:border-l-2 [&_blockquote]:border-violet-500/50 [&_blockquote]:pl-3 [&_blockquote]:text-slate-300 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm"
+                            >
+                              <ReactMarkdown>{item.aiSuggestion}</ReactMarkdown>
+                            </div>
                           </div>
                         </div>
                       )}

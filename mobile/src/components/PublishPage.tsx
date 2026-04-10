@@ -29,9 +29,12 @@ export function PublishPage({
     ...(initialOrder ? { name: initialOrder.name, items: initialOrder.items, image: initialOrder.image, vendorId: initialOrder.vendorId, orderId: initialOrder.orderId } : {}),
   }));
 
+  /** 绑定历史订单时：至少打分（评论可选）；无订单时：发纯动态需有正文 */
   const canPublish = !!(
-    content.trim() ||
-    (selectedOrder.vendorId != null && rating >= 1)
+    (selectedOrder.vendorId != null &&
+      selectedOrder.orderId != null &&
+      rating >= 1) ||
+    (selectedOrder.vendorId == null && content.trim())
   );
 
   const handlePublish = async () => {
@@ -44,12 +47,16 @@ export function PublishPage({
     const uid = currentUserId ?? 1;
     setSubmitting(true);
     try {
-      if (selectedOrder.vendorId != null) {
+      if (selectedOrder.vendorId != null && selectedOrder.orderId != null) {
+        if (rating < 1) {
+          alert("请先为订单打分（1～5 星），评论可留空");
+          return;
+        }
         await createVendorReview({
           userId: uid,
           vendorId: selectedOrder.vendorId,
           orderId: selectedOrder.orderId,
-          rating: rating >= 1 ? rating : 5,
+          rating,
           content: content.trim() || undefined,
         });
       } else {

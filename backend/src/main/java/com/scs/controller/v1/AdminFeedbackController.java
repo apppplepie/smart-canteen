@@ -24,7 +24,7 @@ public class AdminFeedbackController {
     /** 官方尚未回复的反馈列表（posts.post_type=feedback，reply_content 为空） */
     @GetMapping("/pending-replies")
     public ApiResult<List<Post>> pendingReplies() {
-        List<Post> list = postRepo.findByPostTypeAndNoOfficialReply("feedback");
+        List<Post> list = postRepo.findFeedbackPendingOfficialReply();
         enrichWithUser(list);
         return ApiResult.ok(list);
     }

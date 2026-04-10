@@ -104,6 +104,59 @@ public class V1DataController {
         entityClassMap.put(table, entityClass);
     }
 
+    /**
+     * 待官方回复的食堂反馈（直接查 posts：无 reply_content 或仅空白）。
+     * 供 admin 使用，路径在通用 {@code GET /{table}} 之前注册，避免 404（与旧版仅部署 data 接口的环境兼容）。
+     */
+    @GetMapping("/posts/pending-official-replies")
+    public ApiResult<List<Post>> listPostsPendingOfficialReplies() {
+        List<Post> list = postRepo.findFeedbackPendingOfficialReply();
+        enrichPostUsers(list);
+        return ApiResult.ok(list);
+    }
+
+    /** 提交官方回复（posts.reply_content），与 admin 铃铛待办一致 */
+    @PatchMapping("/posts/{id}/official-reply")
+    public ApiResult<Post> patchPostOfficialReply(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        String reply = body != null ? body.get("replyContent") : null;
+        if (reply == null || reply.isBlank()) {
+            return ApiResult.fail(400, "replyContent 不能为空");
+        }
+        return postRepo.findById(id)
+                .map(post -> {
+                    if (!isFeedbackPostType(post.getPostType())) {
+                        return ApiResult.<Post>fail(400, "非反馈类型帖子");
+                    }
+                    post.setReplyContent(reply.trim());
+                    post.setStatus("replied");
+                    Post saved = postRepo.save(post);
+                    enrichPostUsers(List.of(saved));
+                    return ApiResult.ok(saved);
+                })
+                .orElse(ApiResult.fail(404, "帖子不存在"));
+    }
+
+    private static boolean isFeedbackPostType(String postType) {
+        if (postType == null || postType.isBlank()) {
+            return true;
+        }
+        return "feedback".equals(postType.trim());
+    }
+
+    private void enrichPostUsers(List<Post> list) {
+        for (Post p : list) {
+            if (p.getUser() != null) {
+                var u = p.getUser();
+                String name = u.getDisplayName();
+                if (name == null || name.isBlank()) {
+                    name = u.getUsername();
+                }
+                p.setUserDisplayName(name);
+                p.setUserImageUrl(u.getImageUrl());
+            }
+        }
+    }
+
     @GetMapping("/{table}")
     public ApiResult<Map<String, Object>> list(
             @PathVariable String table,
