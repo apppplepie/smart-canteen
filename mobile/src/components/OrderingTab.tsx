@@ -5,7 +5,8 @@ import { MerchantPage } from "./MerchantPage";
 import { cn } from "../lib/utils";
 import { THEME } from "../config/theme";
 import { listVendors, listQueueEntries } from "@scs/api";
-import { getBaseUrl } from "../api/client";
+import { getBaseUrl, isApiConfigured } from "../api/client";
+import { InlineNoticeModal } from "./InlineNoticeModal";
 import { orderingMerchantsFallbackMock } from "../mocks/orderingMerchants";
 
 type Merchant = {
@@ -22,17 +23,23 @@ type Merchant = {
   queueCount: number;
 };
 
-export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
+export function OrderingTab({
+  user,
+  onRequireLogin,
+}: {
+  user?: { userId?: number } | null;
+  onRequireLogin?: () => void;
+}) {
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [activeTab, setActiveTab] = useState<"推荐" | "最快">("推荐");
   const [merchants, setMerchants] = useState<Merchant[]>(() =>
     orderingMerchantsFallbackMock.map((m) => ({ ...m, queueCount: 0 }))
   );
-  const [loading, setLoading] = useState(!!getBaseUrl());
+  const [loading, setLoading] = useState(isApiConfigured());
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
 
   useEffect(() => {
-    const base = getBaseUrl();
-    if (!base) {
+    if (!isApiConfigured()) {
       setLoading(false);
       return;
     }
@@ -102,10 +109,22 @@ export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
             merchant={selectedMerchant}
             onBack={() => setSelectedMerchant(null)}
             user={user}
+            onRequireLogin={onRequireLogin}
             key="merchant-page"
           />
         ) : null}
       </AnimatePresence>
+
+      <InlineNoticeModal
+        open={loginPromptOpen}
+        title="需要登录"
+        message="请先登录后再点餐。是否前往「我的」登录？"
+        confirmLabel="去登录"
+        onConfirm={() => {
+          setLoginPromptOpen(false);
+          onRequireLogin?.();
+        }}
+      />
 
       {/* Header */}
       <div 
@@ -191,7 +210,13 @@ export function OrderingTab({ user }: { user?: { userId?: number } | null }) {
                 whileHover={{ y: -4 }}
                 whileTap={{ scale: 0.98 }}
                 key={merchant.id}
-                onClick={() => setSelectedMerchant(merchant)}
+                onClick={() => {
+                  if (isApiConfigured() && user?.userId == null) {
+                    setLoginPromptOpen(true);
+                    return;
+                  }
+                  setSelectedMerchant(merchant);
+                }}
                 className="bg-white rounded-3xl p-3 shadow-sm border border-gray-100 flex gap-4 cursor-pointer hover:shadow-md transition-all"
               >
                 <img 

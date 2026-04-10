@@ -31,6 +31,15 @@ public class LostItemController {
         return list;
     }
 
+    @GetMapping("/user/{userId}")
+    public List<LostItem> listByUser(@PathVariable Long userId) {
+        List<LostItem> list = repo.findByUser_IdOrderByCreatedAtDesc(userId);
+        for (LostItem item : list) {
+            item.setCommentCount((int) commentRepo.countByLostItem_Id(item.getId()));
+        }
+        return list;
+    }
+
     @GetMapping("/{id}")
     public LostItem get(@PathVariable Long id) {
         return repo.findById(id)
@@ -49,13 +58,32 @@ public class LostItemController {
     }
 
     @PutMapping("/{id}")
-    public LostItem update(@PathVariable Long id, @RequestBody LostItem entity) {
+    public LostItem update(@PathVariable Long id, @RequestBody LostItem patch) {
         return repo.findById(id)
                 .map(existing -> {
-                    entity.setId(id);
-                    entity.setCreatedAt(existing.getCreatedAt());
-                    resolveUser(entity);
-                    return repo.save(entity);
+                    if (patch.getItemName() != null && !patch.getItemName().isBlank()) {
+                        existing.setItemName(patch.getItemName());
+                    }
+                    if (patch.getDescription() != null) {
+                        existing.setDescription(patch.getDescription());
+                    }
+                    if (patch.getLocation() != null) {
+                        existing.setLocation(patch.getLocation());
+                    }
+                    if (patch.getUserName() != null) {
+                        existing.setUserName(patch.getUserName());
+                    }
+                    if (patch.getImageUrl() != null) {
+                        existing.setImageUrl(patch.getImageUrl());
+                    }
+                    if (patch.getStatus() != null && !patch.getStatus().isBlank()) {
+                        existing.setStatus(patch.getStatus());
+                    }
+                    if (patch.getUserId() != null) {
+                        existing.setUserId(patch.getUserId());
+                        resolveUser(existing);
+                    }
+                    return repo.save(existing);
                 })
                 .orElse(null);
     }

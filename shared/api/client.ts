@@ -7,21 +7,31 @@ function sameOriginApi(): boolean {
   return typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_SAME_ORIGIN === "true";
 }
 
-function getBaseUrl(): string {
+function envApiBase(): string {
   const url = typeof import.meta !== "undefined" ? (import.meta as any).env?.VITE_API_BASE_URL : "";
   return typeof url === "string" ? url.replace(/\/$/, "") : "";
 }
 
 export function getApiBaseUrl(): string {
-  return getBaseUrl();
+  return envApiBase();
+}
+
+/** 用于拼接图片等绝对 URL；同站部署且 VITE_API_SAME_ORIGIN=true 时回落为 window.location.origin */
+export function getEffectiveApiBaseUrl(): string {
+  const env = envApiBase();
+  if (env) return env;
+  if (typeof window !== "undefined" && sameOriginApi()) {
+    return window.location.origin.replace(/\/$/, "");
+  }
+  return "";
 }
 
 export function isApiConfigured(): boolean {
-  return !!getBaseUrl() || sameOriginApi();
+  return !!envApiBase() || sameOriginApi();
 }
 
 function resolveFetchUrl(path: string): string {
-  const base = getBaseUrl();
+  const base = envApiBase();
   const p = path.startsWith("/") ? path : `/${path}`;
   if (base) return `${base}${p}`;
   if (sameOriginApi()) return p;

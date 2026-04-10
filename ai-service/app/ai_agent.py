@@ -21,6 +21,16 @@ load_dotenv()
 
 SPRING_BOOT_BASE_URL = os.getenv("SPRING_BOOT_BASE_URL", "http://localhost:8081").rstrip("/")
 
+
+def _llm_openai_kwargs(temperature: float = 0.3) -> dict:
+    """对话与工具调用固定走 DeepSeek（OpenAI 兼容）；豆包仅用于 TTS，见 routers。"""
+    return {
+        "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+        "openai_api_key": os.getenv("DEEPSEEK_API_KEY", "").strip(),
+        "openai_api_base": os.getenv("DEEPSEEK_API_BASE", "https://api.deepseek.com/v1"),
+        "temperature": temperature,
+    }
+
 # 客户端类型
 CLIENT_ADMIN = "admin"
 CLIENT_SCREEN = "screen"
@@ -383,11 +393,12 @@ def _make_should_continue(tools: list):
 
 def _make_agent_node(tools: list):
     def _agent_node(state: State) -> dict:
+        kw = _llm_openai_kwargs(0.3)
         llm = ChatOpenAI(
-            model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
-            openai_api_key=os.getenv("DEEPSEEK_API_KEY", "").strip(),
-            openai_api_base=os.getenv("DEEPSEEK_API_BASE", "https://api.deepseek.com/v1"),
-            temperature=0.3,
+            model=kw["model"],
+            openai_api_key=kw["openai_api_key"],
+            openai_api_base=kw["openai_api_base"],
+            temperature=kw["temperature"],
         ).bind_tools(tools)
         response = llm.invoke(state["messages"])
         return {"messages": [response]}
@@ -444,11 +455,12 @@ def summarize_messages(messages: list[dict]) -> str:
 
 {text}"""
     try:
+        kw = _llm_openai_kwargs(0.2)
         llm = ChatOpenAI(
-            model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
-            openai_api_key=os.getenv("DEEPSEEK_API_KEY", "").strip(),
-            openai_api_base=os.getenv("DEEPSEEK_API_BASE", "https://api.deepseek.com/v1"),
-            temperature=0.2,
+            model=kw["model"],
+            openai_api_key=kw["openai_api_key"],
+            openai_api_base=kw["openai_api_base"],
+            temperature=kw["temperature"],
         )
         resp = llm.invoke([HumanMessage(content=prompt)])
         content = getattr(resp, "content", None) or ""

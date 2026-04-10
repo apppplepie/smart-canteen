@@ -71,5 +71,9 @@ export function postToSharedPost(post: PostDto, vendorName?: string, baseUrl?: s
     postType: post.postType,
     status: post.status,
     reply: post.replyContent != null && post.replyContent.trim() !== "" ? post.replyContent : undefined,
+    aiSuggestion:
+      post.aiSuggestion != null && String(post.aiSuggestion).trim() !== ""
+        ? String(post.aiSuggestion).trim()
+        : undefined,
   };
 }

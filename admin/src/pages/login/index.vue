@@ -4,7 +4,6 @@ import type { LoginRequestData } from "./apis/type"
 import ThemeSwitch from "@@/components/ThemeSwitch/index.vue"
 import { Lock, User } from "@element-plus/icons-vue"
 import { useSettingsStore } from "@/pinia/stores/settings"
-import { getToken } from "@@/utils/local-storage"
 import { useUserStore } from "@/pinia/stores/user"
 import { loginApi } from "./apis"
 import Owl from "./components/Owl.vue"
@@ -26,7 +25,7 @@ const loginFormRef = useTemplateRef("loginFormRef")
 /** 登录按钮 Loading */
 const loading = ref(false)
 
-/** 登录表单数据（默认 admin / 123456，后端已关闭验证码校验） */
+/** 登录表单数据（可预填便于本地调试；不会自动提交，需手动点击登录） */
 const loginFormData: LoginRequestData = reactive({
   username: "admin",
   password: "123456",
@@ -67,13 +66,6 @@ async function handleLogin() {
     loading.value = false
   }
 }
-
-/** 无 token 时自动尝试登录（默认账号已填好） */
-onMounted(async () => {
-  if (getToken()) return
-  await nextTick()
-  handleLogin()
-})
 </script>
 
 <template>

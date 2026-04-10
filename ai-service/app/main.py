@@ -18,7 +18,7 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not DEEPSEEK_API_KEY:
-        print("Warning: DEEPSEEK_API_KEY not set, /api/chat will return 503.")
+        print("Warning: 未设置 DEEPSEEK_API_KEY，/api/chat（含工具）将返回 503。TTS 需火山豆包 OpenSpeech（DOUBAO_TTS_*）。")
     # 启动时打印关键路由，便于确认 8000 上跑的是本服务（避免 404 时误以为是别进程）
     key = [f"{list(r.methods)} {r.path}" for r in app.routes if getattr(r, "path", None) and getattr(r, "methods", None) and ("chat" in r.path or "feedback" in r.path)]
     print("SCS AI Service 已加载:", key, flush=True)

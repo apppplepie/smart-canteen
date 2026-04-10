@@ -1,12 +1,33 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bot, X, Send, Sparkles, Loader2, Plus } from 'lucide-react';
+import { Bot, X, Send, Sparkles, Loader2, Plus, Volume2, VolumeX } from 'lucide-react';
 
-import { getApiBaseUrl } from '../../api/client';
+import { getEffectiveApiBaseUrl, isApiConfigured } from '../../api/client';
 import { aiAssistantInitialMessage } from '../../mocks/aiAssistant';
 
 const SCREEN_CLIENT_ID = 'screen';
+
+/** 与后端豆包音色一致时可设 VITE_TTS_VOICE（如 zh_female_shuangkuaisisi）；不设则由服务端 .env 决定 */
+const TTS_VOICE = (import.meta.env.VITE_TTS_VOICE as string | undefined)?.trim();
+/** 默认 false：TTS 失败时不使用浏览器系统朗读（生硬、非豆包）。仅调试可设 VITE_TTS_BROWSER_FALLBACK=true */
+const TTS_BROWSER_FALLBACK = import.meta.env.VITE_TTS_BROWSER_FALLBACK === 'true';
+/** 可选：Spring 无 /api/ai/tts 映射时直连 FastAPI，如 http://localhost:8000 */
+const AI_SERVICE_BASE = (import.meta.env.VITE_AI_SERVICE_BASE_URL as string | undefined)?.trim().replace(/\/$/, '');
+
+/** 播报前去掉 Markdown，避免朗读星号与代码块 */
+function stripMarkdownForSpeech(s: string): string {
+  return s
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#+\s*/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 800);
+}
 
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,7 +37,10 @@ export function AIAssistant() {
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  /** 默认开启：AI 回复后自动播服务端 TTS（豆包 OpenSpeech）；失败默认不回退系统朗读 */
+  const [autoSpeak, setAutoSpeak] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -25,6 +49,95 @@ export function AIAssistant() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const playAiSpeech = async (rawText: string) => {
+    const plain = stripMarkdownForSpeech(rawText);
+    if (!plain) return;
+
+    if (!isApiConfigured() && !AI_SERVICE_BASE) return;
+
+    try {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      audioRef.current?.pause();
+
+      const body: { text: string; speed: number; voice?: string } = { text: plain, speed: 1 };
+      if (TTS_VOICE) body.voice = TTS_VOICE;
+      const payloadStr = JSON.stringify(body);
+
+      const base = getEffectiveApiBaseUrl().replace(/\/$/, '');
+      const springPaths = ['/api/ai/tts/synthesize', '/api/tts/synthesize'];
+      const springUrls = base
+        ? springPaths.map(p => `${base}${p}`)
+        : springPaths;
+
+      const tryPlay = async (url: string): Promise<boolean> => {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: screenHeaders(),
+          body: payloadStr,
+        });
+        const raw = await res.text();
+        let j: {
+          code?: number;
+          message?: string;
+          data?: { audioBase64?: string; format?: string; provider?: string };
+          audioBase64?: string;
+          format?: string;
+        } = {};
+        try {
+          j = raw ? JSON.parse(raw) : {};
+        } catch {
+          j = {};
+        }
+
+        const apiFail = !res.ok || (j.code !== undefined && j.code !== 0);
+        if (apiFail) {
+          return false;
+        }
+
+        const payload =
+          j.code === 0 && j.data != null ? j.data : (j as { audioBase64?: string; format?: string });
+        const b64 = payload?.audioBase64;
+        const format = payload?.format || 'mp3';
+        if (b64 && typeof b64 === 'string') {
+          const mime = format === 'wav' ? 'audio/wav' : 'audio/mpeg';
+          const audio = new Audio(`data:${mime};base64,${b64}`);
+          audioRef.current = audio;
+          await audio.play();
+          return true;
+        }
+        return false;
+      };
+
+      for (const url of springUrls) {
+        const ok = await tryPlay(url);
+        if (ok) return;
+      }
+
+      if (AI_SERVICE_BASE) {
+        const directUrl = `${AI_SERVICE_BASE}/api/tts/synthesize`;
+        const ok = await tryPlay(directUrl);
+        if (ok) return;
+      }
+
+      console.error(
+        '[TTS] 均失败：请确认已重新编译并启动 Spring Boot（含 POST /api/ai/tts/synthesize），',
+        '开发环境需 Vite 代理 /api 到 8081；或设置 VITE_AI_SERVICE_BASE_URL 直连 ai-service。',
+      );
+    } catch (e) {
+      console.error('[TTS] 请求异常', e);
+    }
+
+    if (TTS_BROWSER_FALLBACK && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      console.warn('[TTS] 使用浏览器系统朗读（非豆包），仅因 VITE_TTS_BROWSER_FALLBACK=true');
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(plain);
+      u.lang = 'zh-CN';
+      window.speechSynthesis.speak(u);
+    }
+  };
 
   const screenHeaders = (): HeadersInit => ({
     'Content-Type': 'application/json',
@@ -44,18 +157,20 @@ export function AIAssistant() {
     setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setIsLoading(true);
 
-    const baseUrl = getApiBaseUrl().replace(/\/$/, "");
-    const sameOrigin = import.meta.env.VITE_API_SAME_ORIGIN === "true";
-    if (!baseUrl && !sameOrigin) {
+    if (!isApiConfigured()) {
       setMessages(prev => [
         ...prev,
-        { role: 'ai', text: '请配置 .env 中的 VITE_API_BASE_URL（Spring Boot 地址）后重启开发服务器。' },
+        {
+          role: 'ai',
+          text: '请配置 .env：VITE_API_BASE_URL 或 VITE_API_SAME_ORIGIN=true（开发时 Vite 已代理 /api → 8081）后重启。',
+        },
       ]);
       setIsLoading(false);
       return;
     }
 
-    const url = baseUrl ? `${baseUrl}/api/ai/chat` : "/api/ai/chat";
+    const chatBase = getEffectiveApiBaseUrl().replace(/\/$/, '');
+    const url = chatBase ? `${chatBase}/api/ai/chat` : '/api/ai/chat';
 
     // 对话由后端 Agent 处理（clientType=screen，可查 vendors 等），不再带前端假数据
     const apiMessages: { role: string; content: string }[] = [
@@ -99,6 +214,9 @@ export function AIAssistant() {
       } else {
         setMessages(prev => [...prev, { role: 'ai', text: content }]);
         if (newConvId != null) setConversationId(newConvId);
+        if (autoSpeak) {
+          void playAiSpeech(content);
+        }
       }
     } catch (error) {
       console.error('AI Error:', error);
@@ -128,6 +246,14 @@ export function AIAssistant() {
                   title="新对话"
                 >
                   <Plus size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAutoSpeak(v => !v)}
+                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                  title={autoSpeak ? '关闭自动播报' : '开启自动播报（服务端 TTS）'}
+                >
+                  {autoSpeak ? <Volume2 size={16} /> : <VolumeX size={16} />}
                 </button>
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] keep-colors">
                   <Bot size={20} />

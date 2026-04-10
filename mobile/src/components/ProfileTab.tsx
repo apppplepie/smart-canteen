@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Settings,
   Bell,
@@ -17,7 +17,8 @@ import { listOrdersByUser } from "../api/orders";
 import type { OrderDto } from "@scs/api";
 import { listVendors } from "../api/vendors";
 import { formatRelativeTime } from "../lib/utils";
-import { getBaseUrl } from "../api/client";
+import { getBaseUrl, isApiConfigured } from "../api/client";
+import { SCS_ORDERS_UPDATED } from "../lib/ordersEvents";
 import { motion, AnimatePresence } from "motion/react";
 import {
   AreaChart,
@@ -90,63 +91,68 @@ export function ProfileTab({
     return () => clearInterval(interval);
   }, [isLoggedIn]);
 
-  useEffect(() => {
+  const loadProfileOrders = useCallback(async () => {
     const base = getBaseUrl();
     const uid = user?.userId;
-    if (!base || uid == null) {
+    if (!isApiConfigured() || uid == null) {
       setRecentOrders([]);
       setActiveOrders([]);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const [list, vendors] = await Promise.all([listOrdersByUser(uid), listVendors()]);
-        if (cancelled) return;
-        const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
-        const baseNorm = base.replace(/\/$/, "");
-        const vendorImageMap = new Map(
-          vendors.map((v) => {
-            const url =
-              v.imageUrl != null && v.imageUrl !== ""
-                ? v.imageUrl.startsWith("http")
-                  ? v.imageUrl
-                  : baseNorm + (v.imageUrl!.startsWith("/") ? v.imageUrl : "/" + v.imageUrl)
-                : `https://picsum.photos/seed/v${v.id}/100/100`;
-            return [v.id, url] as [number, string];
-          })
-        );
-        const completedList = list.filter((o) => isOrderCompleted(o));
-        const rows = completedList.slice(0, 3).map((o) => ({
-          name: vendorMap.get(o.vendorId ?? 0) ?? "订单",
-          time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
-          price: String(o.totalAmount),
-          status: orderStatusLabel(o.status ?? "已完成"),
-          image: vendorImageMap.get(o.vendorId ?? 0) ?? `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
+    try {
+      const [list, vendors] = await Promise.all([listOrdersByUser(uid), listVendors()]);
+      const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
+      const baseNorm = base.replace(/\/$/, "");
+      const vendorImageMap = new Map(
+        vendors.map((v) => {
+          const url =
+            v.imageUrl != null && v.imageUrl !== ""
+              ? v.imageUrl.startsWith("http")
+                ? v.imageUrl
+                : baseNorm + (v.imageUrl!.startsWith("/") ? v.imageUrl : "/" + v.imageUrl)
+              : `https://picsum.photos/seed/v${v.id}/100/100`;
+          return [v.id, url] as [number, string];
+        })
+      );
+      const completedList = list.filter((o) => isOrderCompleted(o));
+      const rows = completedList.slice(0, 3).map((o) => ({
+        name: vendorMap.get(o.vendorId ?? 0) ?? "订单",
+        time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
+        price: String(o.totalAmount),
+        status: orderStatusLabel(o.status ?? "已完成"),
+        image: vendorImageMap.get(o.vendorId ?? 0) ?? `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
+      }));
+      setRecentOrders(rows);
+      const active = list
+        .filter((o) => !isOrderCompleted(o))
+        .map((o) => ({
+          id: o.id,
+          vendorId: o.vendorId,
+          vendorName: vendorMap.get(o.vendorId ?? 0) ?? "食堂",
+          status: o.status ?? "pending",
+          statusLabel: orderStatusLabel(o.status ?? ""),
+          queueNumber: o.queueNumber,
+          totalAmount: o.totalAmount,
+          placedAt: o.placedAt,
         }));
-        setRecentOrders(rows);
-        const active = list
-          .filter((o) => !isOrderCompleted(o))
-          .map((o) => ({
-            id: o.id,
-            vendorId: o.vendorId,
-            vendorName: vendorMap.get(o.vendorId ?? 0) ?? "食堂",
-            status: o.status ?? "pending",
-            statusLabel: orderStatusLabel(o.status ?? ""),
-            queueNumber: o.queueNumber,
-            totalAmount: o.totalAmount,
-            placedAt: o.placedAt,
-          }));
-        setActiveOrders(active);
-      } catch {
-        if (!cancelled) {
-          setRecentOrders([]);
-          setActiveOrders([]);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
+      setActiveOrders(active);
+    } catch {
+      setRecentOrders([]);
+      setActiveOrders([]);
+    }
   }, [user?.userId]);
+
+  useEffect(() => {
+    void loadProfileOrders();
+  }, [loadProfileOrders]);
+
+  useEffect(() => {
+    const onOrdersUpdated = () => {
+      void loadProfileOrders();
+    };
+    window.addEventListener(SCS_ORDERS_UPDATED, onOrdersUpdated);
+    return () => window.removeEventListener(SCS_ORDERS_UPDATED, onOrdersUpdated);
+  }, [loadProfileOrders]);
 
   const handleUserClick = () => {
     if (!isLoggedIn) {

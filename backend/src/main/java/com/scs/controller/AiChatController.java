@@ -164,6 +164,34 @@ public class AiChatController {
     }
 
     /**
+     * POST /api/ai/tts/synthesize — 转发 FastAPI 文本转语音（大屏豆包播报）。
+     * body: { "text": "...", "voice": 可选, "speed": 可选 }
+     */
+    @PostMapping(value = "/tts/synthesize", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ApiResult<Map<String, Object>> ttsSynthesize(@RequestBody Map<String, Object> body) {
+        try {
+            String jsonBody = objectMapper.writeValueAsString(body);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<byte[]> entity = new HttpEntity<>(jsonBody.getBytes(StandardCharsets.UTF_8), headers);
+            RestTemplate rest = new RestTemplate();
+            String responseBody = rest.postForObject(aiServiceBaseUrl + "/api/tts/synthesize", entity, String.class);
+            if (responseBody == null || responseBody.isBlank()) {
+                return ApiResult.fail(502, "TTS 返回为空");
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> out = objectMapper.readValue(responseBody, Map.class);
+            return ApiResult.ok(out);
+        } catch (HttpStatusCodeException e) {
+            String detail = parseFastApiDetail(e.getResponseBodyAsString());
+            return ApiResult.fail(e.getStatusCode().value(), detail != null ? detail : e.getMessage());
+        } catch (Exception e) {
+            log.warn("[AI tts] 调用失败: {}", e.getMessage());
+            return ApiResult.fail(502, "TTS 服务不可用: " + e.getMessage());
+        }
+    }
+
+    /**
      * 调用 AI 服务将用户首条消息总结为 8 字以内标题；失败则返回 null（沿用「新对话」）。
      */
     private String fetchSuggestedTitle(String firstUserMessage) {

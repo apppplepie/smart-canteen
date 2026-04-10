@@ -13,8 +13,10 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { CheckoutPage } from "./CheckoutPage";
 import { listMenuItemsByVendor } from "../api/menuItems";
-import { getBaseUrl } from "../api/client";
+import { getBaseUrl, isApiConfigured } from "../api/client";
 import { merchantMenuFallbackMock } from "../mocks/merchantMenu";
+import { InlineNoticeModal } from "./InlineNoticeModal";
+import { dispatchOrdersUpdated } from "../lib/ordersEvents";
 
 type MenuItemRow = {
   id: number;
@@ -29,19 +31,21 @@ interface MerchantPageProps {
   merchant: { id: number; name: string; image?: string; rating?: number; time?: string; distance?: string };
   onBack: () => void;
   user?: { userId?: number } | null;
+  onRequireLogin?: () => void;
   key?: string;
 }
 
-export function MerchantPage({ merchant, onBack, user }: MerchantPageProps) {
+export function MerchantPage({ merchant, onBack, user, onRequireLogin }: MerchantPageProps) {
   const [cart, setCart] = useState<Record<number, number>>({});
   const [activeCategory, setActiveCategory] = useState("招牌");
   const [showCheckout, setShowCheckout] = useState(false);
   const [menu, setMenu] = useState<MenuItemRow[]>(merchantMenuFallbackMock);
-  const [menuLoading, setMenuLoading] = useState(!!getBaseUrl());
+  const [menuLoading, setMenuLoading] = useState(isApiConfigured());
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
 
   useEffect(() => {
     const base = getBaseUrl();
-    if (!base || !merchant?.id) {
+    if (!isApiConfigured() || !merchant?.id) {
       setMenuLoading(false);
       setMenu(merchantMenuFallbackMock);
       return;
@@ -258,7 +262,13 @@ export function MerchantPage({ merchant, onBack, user }: MerchantPageProps) {
               </div>
             </div>
             <button 
-              onClick={() => setShowCheckout(true)}
+              onClick={() => {
+                if (isApiConfigured() && user?.userId == null) {
+                  setLoginPromptOpen(true);
+                  return;
+                }
+                setShowCheckout(true);
+              }}
               className="bg-[#FF6B6B] text-white px-6 py-2.5 rounded-full font-bold text-sm hover:bg-[#FF8E8E] transition-colors shadow-sm shadow-red-500/30"
             >
               去结算
@@ -274,11 +284,27 @@ export function MerchantPage({ merchant, onBack, user }: MerchantPageProps) {
             cart={cart}
             totalPrice={totalPrice}
             onBack={() => setShowCheckout(false)}
+            onCheckoutSuccess={() => {
+              setCart({});
+              setShowCheckout(false);
+              dispatchOrdersUpdated();
+            }}
             menu={menu}
             userId={user?.userId}
           />
         )}
       </AnimatePresence>
+
+      <InlineNoticeModal
+        open={loginPromptOpen}
+        title="需要登录"
+        message="请先登录后再下单。是否前往「我的」登录？"
+        confirmLabel="去登录"
+        onConfirm={() => {
+          setLoginPromptOpen(false);
+          onRequireLogin?.();
+        }}
+      />
     </motion.div>
   );
 }

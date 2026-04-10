@@ -8,7 +8,8 @@ services:
     ports:
       - "${FRONTEND_HOST_PORT:-9080}:80"
     environment:
-      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-http://172.17.0.1:8081}
+      # 默认走宿主机后端（与 extra_hosts 一致）；Linux 无 host 名时再在 .env 写 http://172.17.0.1:8081
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-http://host.docker.internal:8081}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

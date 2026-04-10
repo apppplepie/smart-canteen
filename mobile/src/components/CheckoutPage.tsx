@@ -5,23 +5,40 @@ import { THEME } from "../config/theme";
 import { cn } from "../lib/utils";
 import { createOrder } from "../api/orders";
 import { createOrderItem } from "../api/orderItems";
-import { getBaseUrl } from "../api/client";
+import { isApiConfigured } from "../api/client";
 import { checkoutAddressesMock } from "../mocks/checkoutAddresses";
+import { InlineNoticeModal } from "./InlineNoticeModal";
 
 interface CheckoutPageProps {
   merchant: { id: number; name: string };
   cart: Record<number, number>;
   totalPrice: number;
   onBack: () => void;
+  /** 支付成功并关闭弹窗后调用：用于清空购物车、关闭结算页 */
+  onCheckoutSuccess?: (info: { queueNumber: string }) => void;
   menu: { id: number; name: string; price: number; image?: string }[];
   userId?: number;
 }
 
-export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu, userId }: CheckoutPageProps) {
+type NoticeState =
+  | { kind: "success"; queueNumber: string }
+  | { kind: "error"; message: string }
+  | { kind: "info"; message: string };
+
+export function CheckoutPage({
+  merchant,
+  cart,
+  totalPrice,
+  onBack,
+  onCheckoutSuccess,
+  menu,
+  userId,
+}: CheckoutPageProps) {
   const [orderType, setOrderType] = useState<"dine-in" | "delivery">("dine-in");
   const [isPaying, setIsPaying] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState(checkoutAddressesMock[0] ?? "");
+  const [notice, setNotice] = useState<NoticeState | null>(null);
 
   const addresses = checkoutAddressesMock;
 
@@ -37,9 +54,12 @@ export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu, userId 
   const finalPrice = totalPrice + packageFee + deliveryFee;
 
   const handlePay = async () => {
-    const base = getBaseUrl();
-    if (!base) {
-      alert("未配置后端地址，无法下单");
+    if (!isApiConfigured()) {
+      setNotice({ kind: "info", message: "未配置后端地址（或同站 API），无法下单。请检查环境变量 VITE_API_BASE_URL 或 VITE_API_SAME_ORIGIN。" });
+      return;
+    }
+    if (userId == null) {
+      setNotice({ kind: "info", message: "请先登录后再下单。" });
       return;
     }
     setIsPaying(true);
@@ -48,10 +68,10 @@ export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu, userId 
       const packageFee = 1;
       const finalAmount = totalPrice + packageFee + deliveryFee;
       const order = await createOrder({
-        userId: userId ?? 1,
+        userId,
         vendorId: merchant.id,
         totalAmount: finalAmount,
-        status: "pending",
+        status: "completed",
         queueNumber: "A" + Math.floor(100 + Math.random() * 900),
       });
       const entries = Object.entries(cart).filter(([, count]) => count > 0);
@@ -66,13 +86,24 @@ export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu, userId 
           });
         }
       }
-      alert("支付成功！取餐码: " + order.queueNumber);
-      onBack();
+      const qn = order.queueNumber ?? "";
+      setNotice({ kind: "success", queueNumber: qn });
     } catch (e) {
-      alert("下单失败: " + (e instanceof Error ? e.message : String(e)));
+      setNotice({
+        kind: "error",
+        message: "下单失败：" + (e instanceof Error ? e.message : String(e)),
+      });
     } finally {
       setIsPaying(false);
     }
+  };
+
+  const dismissNotice = () => {
+    if (!notice) return;
+    if (notice.kind === "success") {
+      onCheckoutSuccess?.({ queueNumber: notice.queueNumber });
+    }
+    setNotice(null);
   };
 
   return (
@@ -293,6 +324,38 @@ export function CheckoutPage({ merchant, cart, totalPrice, onBack, menu, userId 
           </motion.div>
         )}
       </AnimatePresence>
+
+      <InlineNoticeModal
+        open={notice != null}
+        title={
+          notice?.kind === "success"
+            ? "支付成功"
+            : notice?.kind === "error"
+              ? "下单失败"
+              : "提示"
+        }
+        message={
+          notice?.kind === "success"
+            ? "请凭以下取餐码取餐"
+            : notice?.kind === "error" || notice?.kind === "info"
+              ? notice.message
+              : undefined
+        }
+        detail={
+          notice?.kind === "success" ? (
+            <div className="rounded-2xl bg-gray-50 py-4 text-center">
+              <div className="text-xs text-gray-500 mb-1">取餐码</div>
+              <div className="text-3xl font-bold tracking-wider text-gray-900 font-mono">
+                {notice.queueNumber}
+              </div>
+            </div>
+          ) : undefined
+        }
+        confirmLabel={notice?.kind === "success" ? "完成" : "知道了"}
+        onConfirm={() => {
+          dismissNotice();
+        }}
+      />
     </motion.div>
   );
 }

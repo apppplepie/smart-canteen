@@ -21,8 +21,15 @@ export default defineConfig(({mode}) => {
     },
     server: {
       port: 5174,
-      host: "localhost",
+      host: 'localhost',
       hmr: process.env.DISABLE_HMR !== 'true',
+      // 开发时同站 /api → Spring Boot，避免请求落到 Vite 自身导致 404
+      proxy: {
+        '/api': {
+          target: env.VITE_DEV_PROXY_TARGET || 'http://localhost:8081',
+          changeOrigin: true,
+        },
+      },
     },
   };
 });

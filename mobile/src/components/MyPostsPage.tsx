@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, Heart, MessageCircle, Loader2 } from "lucide-react";
+import { ChevronLeft, Heart, MessageCircle, Loader2, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { THEME } from "../config/theme";
 import { listPostsByUser } from "../api";
 import { postToSharedPost } from "../api/mapPost";
-import { getBaseUrl } from "../api/client";
+import { getBaseUrl, isApiConfigured } from "../api/client";
 import type { SharedPost } from "./SharedPostDetail";
 import { myPostsFallbackMock } from "../mocks/myPosts";
+import { MarkdownBlock } from "./MarkdownBlock";
 
 export function MyPostsPage({ onBack, user }: { onBack: () => void; user: { name: string; id: string; avatar: string; userId?: number } }) {
   const [posts, setPosts] = useState<SharedPost[]>(myPostsFallbackMock);
-  const [loading, setLoading] = useState(!!getBaseUrl());
+  const [loading, setLoading] = useState(isApiConfigured());
 
   useEffect(() => {
     const base = getBaseUrl();
-    const uid = user?.userId ?? 1;
-    if (!base) {
+    const uid = user?.userId;
+    if (!isApiConfigured() || uid == null) {
       setLoading(false);
       return;
     }
@@ -89,9 +90,30 @@ export function MyPostsPage({ onBack, user }: { onBack: () => void; user: { name
                     />
                   )}
                   <div className="p-4">
-                    <p className="text-sm text-gray-800 line-clamp-2 mb-3 leading-relaxed">
+                    {post.tags && post.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {post.tags.map((t) => (
+                          <span
+                            key={t}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <p className="text-sm text-gray-800 line-clamp-4 mb-3 leading-relaxed whitespace-pre-wrap">
                       {post.content}
                     </p>
+                    {post.postType === "feedback" && post.aiSuggestion ? (
+                      <div className="rounded-2xl border border-violet-500/25 bg-violet-500/[0.06] p-3 mb-3">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-violet-700 mb-2">
+                          <Sparkles size={14} className="shrink-0" />
+                          AI建议
+                        </div>
+                        <MarkdownBlock text={post.aiSuggestion} className="text-gray-800" />
+                      </div>
+                    ) : null}
                     <div className="flex items-center justify-between text-gray-400">
                       <span className="text-xs">{post.time ?? post.postTime}</span>
                       <div className="flex items-center gap-4">

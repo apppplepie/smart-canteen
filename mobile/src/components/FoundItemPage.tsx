@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, Image as ImageIcon, MapPin, Clock, CheckCircle2, Loader2 } from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { ChevronLeft, Image as ImageIcon, MapPin, Clock, CheckCircle2, Loader2, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { formatRelativeTime } from "../lib/utils";
 import { SharedPostDetail } from "./SharedPostDetail";
-import { foundItemHistoryMock } from "../mocks/foundItem";
 import { listFoundItemsByUser, createFoundItem, updateFoundItem } from "../api/foundItems";
-import { getBaseUrl } from "../api/client";
+import { getBaseUrl, isApiConfigured } from "../api/client";
+import { uploadImageFile } from "../api/upload";
+import type { FoundItemDto } from "@scs/api";
 
 export type FoundItemRow = {
   id: number;
@@ -25,6 +26,25 @@ function formatFoundTime(iso: string | undefined): string {
   return d.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function mapDtoToRow(f: FoundItemDto, base: string): FoundItemRow {
+  const baseNorm = base.replace(/\/$/, "");
+  let image = "";
+  const raw = f.imageUrl?.trim();
+  if (raw) {
+    image = raw.startsWith("http") ? raw : baseNorm + (raw.startsWith("/") ? raw : `/${raw}`);
+  }
+  return {
+    id: f.id,
+    user: { name: "我", avatar: "https://picsum.photos/seed/me/100/100" },
+    content: f.description?.trim() || f.title || "",
+    image,
+    location: f.location ?? "",
+    time: formatFoundTime(f.createdAt),
+    isReturned: (f.status ?? "").toLowerCase() === "returned",
+    postTime: f.createdAt ? formatRelativeTime(f.createdAt) : "",
+  };
+}
+
 export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?: number }) {
   const [activeTab, setActiveTab] = useState<"发布" | "历史">("发布");
   const [content, setContent] = useState("");
@@ -33,39 +53,46 @@ export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?:
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishError, setPublishError] = useState("");
 
-  const [history, setHistory] = useState<FoundItemRow[]>(foundItemHistoryMock);
-  const [loading, setLoading] = useState(!!getBaseUrl() && userId != null);
+  const [history, setHistory] = useState<FoundItemRow[]>([]);
+  const [loading, setLoading] = useState(isApiConfigured() && userId != null);
   const [selectedPost, setSelectedPost] = useState<FoundItemRow | null>(null);
 
-  const fetchHistory = useCallback(async () => {
-    const base = getBaseUrl();
-    if (!base || userId == null) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const list = await listFoundItemsByUser(userId);
-      const rows: FoundItemRow[] = list.map((f) => ({
-        id: f.id,
-        user: { name: "我", avatar: "https://picsum.photos/seed/me/100/100" },
-        content: f.description?.trim() || f.title || "",
-        image: f.imageUrl?.trim() ? f.imageUrl : "https://picsum.photos/seed/card/400/300",
-        location: f.location ?? "",
-        time: formatFoundTime(f.createdAt),
-        isReturned: (f as { status?: string }).status === "returned",
-        postTime: f.createdAt ? formatRelativeTime(f.createdAt) : "",
-      }));
-      setHistory(rows.length ? rows : foundItemHistoryMock);
-    } catch {
-      setHistory(foundItemHistoryMock);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pickedFile, setPickedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+    return () => {
+      if (previewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const loadList = useCallback(
+    async (showLoading: boolean) => {
+      if (!isApiConfigured() || userId == null) {
+        setLoading(false);
+        return;
+      }
+      const base = getBaseUrl();
+      if (showLoading) setLoading(true);
+      try {
+        const list = await listFoundItemsByUser(userId);
+        const rows = list.map((f) => mapDtoToRow(f, base));
+        setHistory(rows);
+      } catch {
+        /* 保留当前列表 */
+      } finally {
+        if (showLoading) setLoading(false);
+      }
+    },
+    [userId],
+  );
+
+  useEffect(() => {
+    void loadList(true);
+  }, [loadList]);
 
   const handleBack = () => {
     if (selectedPost) {
@@ -75,45 +102,84 @@ export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?:
     }
   };
 
+  const clearPickedImage = () => {
+    if (previewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setPickedFile(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f || !f.type.startsWith("image/")) return;
+    if (f.size > 8 * 1024 * 1024) {
+      setPublishError("图片请小于 8MB");
+      return;
+    }
+    setPublishError("");
+    if (previewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPickedFile(f);
+    setPreviewUrl(URL.createObjectURL(f));
+  };
+
   const toggleReturned = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     const item = history.find((h) => h.id === id);
     if (!item) return;
     const nextReturned = !item.isReturned;
     setHistory(history.map((h) => (h.id === id ? { ...h, isReturned: nextReturned } : h)));
-    const base = getBaseUrl();
-    if (base) {
-      try {
-        await updateFoundItem(id, { status: nextReturned ? "returned" : "pending" } as any);
-      } catch {
-        setHistory(history.map((h) => (h.id === id ? { ...h, isReturned: !nextReturned } : h)));
-      }
+    if (!isApiConfigured()) return;
+    try {
+      await updateFoundItem(id, { status: nextReturned ? "returned" : "pending" });
+    } catch {
+      setHistory(history.map((h) => (h.id === id ? { ...h, isReturned: !nextReturned } : h)));
     }
   };
 
   const handlePublish = async () => {
     if (!content.trim()) return;
     setPublishError("");
+    if (isApiConfigured() && userId == null) {
+      setPublishError("请先登录后再发布");
+      return;
+    }
     setPublishLoading(true);
     try {
-      if (getBaseUrl() && userId != null) {
-        await createFoundItem({
+      if (isApiConfigured() && userId != null) {
+        const base = getBaseUrl();
+        let imageUrl: string | undefined;
+        if (pickedFile) {
+          const { storedPath } = await uploadImageFile(pickedFile);
+          imageUrl = storedPath;
+        }
+        const created = await createFoundItem({
+          userId,
           title: content.slice(0, 50),
           description: content,
           location: location.trim() || undefined,
-          imageUrl: "https://picsum.photos/seed/card/400/300",
+          imageUrl,
         });
-        await fetchHistory();
+        const row = mapDtoToRow(created, base);
+        setHistory((prev) => {
+          const rest = prev.filter((h) => h.id !== row.id);
+          return [row, ...rest];
+        });
+        void loadList(false);
         setContent("");
         setLocation("");
         setTime("");
+        clearPickedImage();
         setActiveTab("历史");
-      } else {
+      } else if (!isApiConfigured()) {
         const newItem: FoundItemRow = {
           id: Date.now(),
           user: { name: "我", avatar: "https://picsum.photos/seed/me/100/100" },
           content,
-          image: "https://picsum.photos/seed/card/400/300",
+          image: previewUrl && !previewUrl.startsWith("blob:") ? previewUrl : "",
           location,
           time: time || "刚刚",
           isReturned: false,
@@ -123,6 +189,7 @@ export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?:
         setContent("");
         setLocation("");
         setTime("");
+        clearPickedImage();
         setActiveTab("历史");
       }
     } catch (err) {
@@ -140,6 +207,7 @@ export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?:
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
       className="fixed inset-0 bg-gray-50 z-[100] flex flex-col"
     >
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
       <div className="bg-white px-4 pt-6 pb-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <button onClick={handleBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-full">
           <ChevronLeft size={24} />
@@ -198,19 +266,37 @@ export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?:
                   placeholder="描述您捡到的物品特征及目前放置位置..."
                   className="w-full h-32 bg-gray-50 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all border border-gray-100 resize-none mb-4"
                 />
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                  <button type="button" className="aspect-square bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:bg-gray-100 hover:border-gray-300 transition-all">
-                    <ImageIcon size={28} className="mb-2" />
-                    <span className="text-xs font-medium">添加照片</span>
-                  </button>
+                <div className="mb-6">
+                  {previewUrl ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-gray-100">
+                      <img src={previewUrl} alt="" className="w-full h-44 object-cover" referrerPolicy="no-referrer" />
+                      <button
+                        type="button"
+                        onClick={clearPickedImage}
+                        className="absolute top-2 right-2 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70"
+                        aria-label="移除图片"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="w-full aspect-[16/9] max-h-44 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:bg-gray-100 hover:border-gray-300 transition-all"
+                    >
+                      <ImageIcon size={28} className="mb-2" />
+                      <span className="text-xs font-medium">点击添加照片（可选）</span>
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-4 mb-6">
                   <div className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3 border border-gray-100">
-                    <MapPin size={20} className="text-gray-400" />
+                    <MapPin size={20} className="text-gray-400 shrink-0" />
                     <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="拾取位置 (如: 二楼西区)" className="bg-transparent border-none focus:outline-none text-sm w-full" />
                   </div>
                   <div className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3 border border-gray-100">
-                    <Clock size={20} className="text-gray-400" />
+                    <Clock size={20} className="text-gray-400 shrink-0" />
                     <input type="text" value={time} onChange={(e) => setTime(e.target.value)} placeholder="拾取时间 (如: 今天上午11点)" className="bg-transparent border-none focus:outline-none text-sm w-full" />
                   </div>
                 </div>
@@ -230,6 +316,8 @@ export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?:
                 <div className="flex justify-center py-12">
                   <Loader2 size={28} className="animate-spin text-blue-500" />
                 </div>
+              ) : history.length === 0 ? (
+                <p className="text-center text-gray-500 text-sm py-12">暂无招领记录，去发布一条吧</p>
               ) : (
                 history.map((item) => (
                   <div key={item.id} onClick={() => setSelectedPost(item)} className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all">
@@ -247,10 +335,14 @@ export function FoundItemPage({ onBack, userId }: { onBack: () => void; userId?:
                       </button>
                     </div>
                     <p className="text-gray-800 text-sm mb-3 line-clamp-2">{item.content}</p>
-                    {item.image && <img src={item.image} className="w-full h-32 object-cover rounded-xl mb-3" referrerPolicy="no-referrer" alt="" />}
+                    {item.image ? <img src={item.image} className="w-full h-32 object-cover rounded-xl mb-3" referrerPolicy="no-referrer" alt="" /> : null}
                     <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span className="flex items-center gap-1"><MapPin size={12} /> {item.location}</span>
-                      <span className="flex items-center gap-1"><Clock size={12} /> {item.time}</span>
+                      <span className="flex items-center gap-1">
+                        <MapPin size={12} /> {item.location}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} /> {item.time}
+                      </span>
                     </div>
                   </div>
                 ))

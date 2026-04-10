@@ -57,8 +57,8 @@ export function registerNavigationGuard(router: Router) {
       // 设置 replace: true, 因此导航将不会留下历史记录
       return { ...to, replace: true }
     } catch {
-      // 不卡权限：拉取用户信息失败仍放行后台（仅本地角色占位，避免一进系统就红字报错）
-      userStore.setGuardFallbackSession("admin", ["admin"])
+      // 不卡权限：拉取用户信息失败仍放行后台（占位名避免误显示为「管理员」账号）
+      userStore.setGuardFallbackSession("已登录（用户信息未同步）", ["admin"])
       permissionStore.setRoutes(userStore.roles)
       permissionStore.addRoutes.forEach(route => router.addRoute(route))
       return { ...to, replace: true }

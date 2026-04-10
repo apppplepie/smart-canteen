@@ -35,6 +35,10 @@ public class LostItem {
     @Column(name = "image_url", length = 512)
     private String imageUrl;
 
+    /** pending=寻找中, found=已找回 */
+    @Column(length = 32)
+    private String status = "pending";
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -44,6 +48,9 @@ public class LostItem {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        if (status == null || status.isBlank()) {
+            status = "pending";
+        }
     }
 
     public Long getId() { return id; }
@@ -62,6 +69,8 @@ public class LostItem {
     public void setDescription(String description) { this.description = description; }
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Integer getCommentCount() { return commentCount; }

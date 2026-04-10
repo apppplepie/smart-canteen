@@ -85,10 +85,13 @@ export interface PostDto {
 
 export interface FoundItemDto {
   id: number;
+  userId?: number;
   title: string;
   location?: string;
   description?: string;
   imageUrl?: string;
+  /** pending | returned */
+  status?: string;
   createdAt?: string;
 }
 
@@ -100,6 +103,8 @@ export interface LostItemDto {
   location?: string;
   description?: string;
   imageUrl?: string;
+  /** pending | found */
+  status?: string;
   commentCount?: number;
   createdAt?: string;
 }

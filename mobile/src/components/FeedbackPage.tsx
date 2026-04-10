@@ -6,7 +6,8 @@ import { formatRelativeTime } from "../lib/utils";
 import { SharedPostDetail } from "./SharedPostDetail";
 import { feedbackHistoryMock } from "../mocks/feedback";
 import { listPostsByUser, createPost } from "../api/posts";
-import { getBaseUrl } from "../api/client";
+import { getBaseUrl, isApiConfigured } from "../api/client";
+import { MarkdownBlock } from "./MarkdownBlock";
 
 const FEEDBACK_TYPE_MAP: Record<string, string> = {
   "菜品质量": "food",
@@ -40,12 +41,11 @@ export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: 
   const [submitError, setSubmitError] = useState("");
 
   const [history, setHistory] = useState<FeedbackRow[]>(feedbackHistoryMock);
-  const [loading, setLoading] = useState(!!getBaseUrl() && userId != null);
+  const [loading, setLoading] = useState(isApiConfigured() && userId != null);
   const [selectedPost, setSelectedPost] = useState<FeedbackRow | null>(null);
 
   const fetchHistory = useCallback(async () => {
-    const base = getBaseUrl();
-    if (!base || userId == null) {
+    if (!isApiConfigured() || userId == null) {
       setLoading(false);
       return;
     }
@@ -86,7 +86,7 @@ export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: 
     setSubmitError("");
     setSubmitLoading(true);
     try {
-      if (getBaseUrl() && userId != null) {
+      if (isApiConfigured() && userId != null) {
         await createPost({
           userId,
           content,
@@ -187,7 +187,7 @@ export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: 
                         </div>
                         <div className="flex-1 rounded-xl border bg-violet-500/10 border-violet-500/30 pl-4 pr-4 py-3">
                           <p className="text-xs font-bold mb-1.5 text-violet-600">AI建议</p>
-                          <p className="text-sm leading-relaxed text-gray-800">{selectedPost.aiSuggestion}</p>
+                          <MarkdownBlock text={selectedPost.aiSuggestion} className="text-sm text-gray-800" />
                         </div>
                       </div>
                     )}
@@ -198,7 +198,7 @@ export function FeedbackPage({ onBack, userId }: { onBack: () => void; userId?: 
                         </div>
                         <div className="flex-1 rounded-xl border bg-emerald-500/10 border-emerald-500/30 pl-4 pr-4 py-3">
                           <p className="text-xs font-bold mb-1.5 text-emerald-600">官方回复</p>
-                          <p className="text-sm leading-relaxed text-gray-800">{selectedPost.reply}</p>
+                          <MarkdownBlock text={selectedPost.reply ?? ""} className="text-sm text-gray-800" />
                         </div>
                       </div>
                     )}

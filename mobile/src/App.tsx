@@ -105,7 +105,9 @@ export default function App() {
             transition={{ duration: 0.2 }}
             className="flex-1 h-full"
           >
-            {activeTab === "ordering" && <OrderingTab user={user} />}
+            {activeTab === "ordering" && (
+              <OrderingTab user={user} onRequireLogin={() => setActiveTab("profile")} />
+            )}
             {activeTab === "dynamics" && (
               <DynamicsTab
                 user={user}
@@ -135,7 +137,9 @@ export default function App() {
               </div>
             )}
             {activeTab === "assistant" && user && <AIAssistantTab user={user ?? undefined} />}
-            {activeTab === "online" && <CanteenOnlineTab user={user} />}
+            {activeTab === "online" && (
+              <CanteenOnlineTab user={user} onRequireLogin={() => setActiveTab("profile")} />
+            )}
             {activeTab === "profile" && <ProfileTab user={user} onLogin={setUser} onNavigate={setActiveTab} />}
           </motion.div>
         </AnimatePresence>

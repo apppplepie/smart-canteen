@@ -31,6 +31,8 @@ export interface SharedPost {
   likedByCurrentUser?: boolean;
   /** 1-5 星，美食评价帖展示打分 */
   rating?: number;
+  /** 反馈帖 AI 建议（可为 Markdown） */
+  aiSuggestion?: string;
 }
 
 interface SharedPostDetailProps {

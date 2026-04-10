@@ -20,6 +20,8 @@ import { FeedbackPage } from "./FeedbackPage";
 import { LostItemPage } from "./LostItemPage";
 import { FoundItemPage } from "./FoundItemPage";
 import { getWindowMerchantByIndex } from "../mocks/canteenWindow";
+import { isApiConfigured } from "../api/client";
+import { InlineNoticeModal } from "./InlineNoticeModal";
 
 // Helper to get color based on crowd level (0-100)
 const getHeatColor = (level: number) => {
@@ -30,10 +32,17 @@ const getHeatColor = (level: number) => {
   return "bg-red-500 text-white";
 };
 
-export function CanteenOnlineTab({ user }: { user?: { userId?: number } | null }) {
+export function CanteenOnlineTab({
+  user,
+  onRequireLogin,
+}: {
+  user?: { userId?: number } | null;
+  onRequireLogin?: () => void;
+}) {
   const [crowdLevels, setCrowdLevels] = useState<number[]>([]);
   const [selectedMerchant, setSelectedMerchant] = useState<{ id: number; name: string; image?: string; rating?: number; time?: string; distance?: string } | null>(null);
   const [activeService, setActiveService] = useState<"feedback" | "lost" | "found" | null>(null);
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
 
   // 从食堂圈 AI 小结「寻物/招领」跳转：由 DynamicsTab 写入 sessionStorage
   useEffect(() => {
@@ -72,6 +81,10 @@ export function CanteenOnlineTab({ user }: { user?: { userId?: number } | null }
   }, [crowdLevels]);
 
   const handleWindowClick = (index: number) => {
+    if (isApiConfigured() && user?.userId == null) {
+      setLoginPromptOpen(true);
+      return;
+    }
     setSelectedMerchant(getWindowMerchantByIndex(index));
   };
 
@@ -83,12 +96,24 @@ export function CanteenOnlineTab({ user }: { user?: { userId?: number } | null }
             merchant={selectedMerchant}
             onBack={() => setSelectedMerchant(null)}
             user={user}
+            onRequireLogin={onRequireLogin}
           />
         )}
         {activeService === "feedback" && <FeedbackPage onBack={() => setActiveService(null)} userId={user?.userId} />}
         {activeService === "lost" && <LostItemPage onBack={() => setActiveService(null)} userId={user?.userId} />}
         {activeService === "found" && <FoundItemPage onBack={() => setActiveService(null)} userId={user?.userId} />}
       </AnimatePresence>
+
+      <InlineNoticeModal
+        open={loginPromptOpen}
+        title="需要登录"
+        message="请先登录后再点餐。是否前往「我的」登录？"
+        confirmLabel="去登录"
+        onConfirm={() => {
+          setLoginPromptOpen(false);
+          onRequireLogin?.();
+        }}
+      />
 
       {/* Header */}
       <div className="bg-[#FF6B6B] px-6 pt-6 pb-24 text-white relative overflow-hidden">

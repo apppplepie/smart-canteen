@@ -6,6 +6,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends tzdata && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+ENV PIP_DEFAULT_TIMEOUT=300
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .

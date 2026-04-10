@@ -34,6 +34,17 @@ services:
       - "8000:8000"
     environment:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      ARK_API_KEY: ${ARK_API_KEY:-}
+      ARK_ENDPOINT_ID: ${ARK_ENDPOINT_ID:-}
+      ARK_TTS_ENDPOINT_ID: ${ARK_TTS_ENDPOINT_ID:-}
+      ARK_API_BASE: ${ARK_API_BASE:-https://ark.cn-beijing.volces.com/api/v3}
+      DOUBAO_TTS_APP_ID: ${DOUBAO_TTS_APP_ID:-}
+      DOUBAO_TTS_ACCESS_TOKEN: ${DOUBAO_TTS_ACCESS_TOKEN:-}
+      DOUBAO_TTS_RESOURCE_ID: ${DOUBAO_TTS_RESOURCE_ID:-}
+      DOUBAO_TTS_USE_V3: ${DOUBAO_TTS_USE_V3:-}
+      DOUBAO_TTS_CLUSTER: ${DOUBAO_TTS_CLUSTER:-volcano_tts}
+      DOUBAO_TTS_UID: ${DOUBAO_TTS_UID:-scs-ai}
+      DOUBAO_TTS_VOICE: ${DOUBAO_TTS_VOICE:-zh_female_shuangkuaisisi}
       # 容器内 localhost 不是后端，必须用 compose 服务名访问 Spring Boot
       SPRING_BOOT_BASE_URL: http://backend:8081
     healthcheck:

@@ -388,12 +388,16 @@ ALTER TABLE `stock_movements`
 DROP TABLE IF EXISTS `found_items`;
 CREATE TABLE `found_items` (
   `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NULL DEFAULT NULL COMMENT '发布用户',
   `title` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '标题，如 捡到黑色保温杯',
   `location` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '捡到地点',
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '描述',
   `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '图片URL',
+  `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'pending' COMMENT 'pending|returned',
   `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`) USING BTREE
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_found_user` (`user_id`),
+  CONSTRAINT `found_items_ibfk_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '捡到失物公示' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
@@ -407,6 +411,8 @@ CREATE TABLE `lost_items` (
   `item_name` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '遗失物品名称',
   `location` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '遗失地点',
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '补充描述',
+  `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '物品图片 URL',
+  `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'pending' COMMENT 'pending|found',
   `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_lost_created`(`created_at` DESC) USING BTREE,
@@ -592,5 +598,13 @@ CREATE TABLE `post_vector_index` (
   UNIQUE KEY `uk_post_vector_post_id` (`post_id`),
   CONSTRAINT `fk_post_vector_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='帖子向量索引';
+
+-- ----------------------------
+-- Seed data for users
+-- ----------------------------
+INSERT INTO `users` (`id`, `username`, `password`, `display_name`, `role`, `is_deleted`)
+VALUES
+  (1, '1', '123456', '测试用户1', 'student', 0),
+  (2, 'admin', '123456', '系统管理员', 'admin', 0);
 
 SET FOREIGN_KEY_CHECKS = 1;

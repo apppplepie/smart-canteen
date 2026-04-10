@@ -6,11 +6,29 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+const emit = defineEmits<{
+  itemClick: [item: NotifyItem]
+}>()
+
+function onCardClick(item: NotifyItem) {
+  if (item.postId != null) {
+    emit("itemClick", item)
+  }
+}
 </script>
 
 <template>
   <el-empty v-if="props.data.length === 0" />
-  <el-card v-else v-for="(item, index) in props.data" :key="index" shadow="never" class="card-container">
+  <el-card
+    v-else
+    v-for="(item, index) in props.data"
+    :key="item.postId ?? index"
+    shadow="never"
+    class="card-container"
+    :class="{ 'is-clickable': item.postId != null }"
+    @click="onCardClick(item)"
+  >
     <template #header>
       <div class="card-header">
         <div>
@@ -55,6 +73,13 @@ const props = defineProps<Props>()
   }
   .card-body {
     font-size: 12px;
+  }
+  &.is-clickable {
+    cursor: pointer;
+    transition: background 0.15s;
+    &:hover {
+      background: var(--el-fill-color-light);
+    }
   }
 }
 </style>

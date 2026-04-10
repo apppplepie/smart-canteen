@@ -12,7 +12,7 @@ services:
       MYSQL_PASSWORD: scs
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./scs.sql:/docker-entrypoint-initdb.d/01-scs.sql:ro
+      - ./backend/src/main/resources/scs.sql:/docker-entrypoint-initdb.d/01-scs.sql:ro
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
@@ -33,6 +33,17 @@ services:
           - scs-ai-service
     environment:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      ARK_API_KEY: ${ARK_API_KEY:-}
+      ARK_ENDPOINT_ID: ${ARK_ENDPOINT_ID:-}
+      ARK_TTS_ENDPOINT_ID: ${ARK_TTS_ENDPOINT_ID:-}
+      ARK_API_BASE: ${ARK_API_BASE:-https://ark.cn-beijing.volces.com/api/v3}
+      DOUBAO_TTS_APP_ID: ${DOUBAO_TTS_APP_ID:-}
+      DOUBAO_TTS_ACCESS_TOKEN: ${DOUBAO_TTS_ACCESS_TOKEN:-}
+      DOUBAO_TTS_RESOURCE_ID: ${DOUBAO_TTS_RESOURCE_ID:-}
+      DOUBAO_TTS_USE_V3: ${DOUBAO_TTS_USE_V3:-}
+      DOUBAO_TTS_CLUSTER: ${DOUBAO_TTS_CLUSTER:-volcano_tts}
+      DOUBAO_TTS_UID: ${DOUBAO_TTS_UID:-scs-ai}
+      DOUBAO_TTS_VOICE: ${DOUBAO_TTS_VOICE:-zh_female_shuangkuaisisi}
       VITE_DEEPSEEK_API_KEY: ${VITE_DEEPSEEK_API_KEY:-}
       SPRING_BOOT_BASE_URL: http://backend:8081
     healthcheck:
@@ -54,7 +65,7 @@ services:
         aliases:
           - scs-backend
     environment:
-      SPRING_DATASOURCE_URL: "jdbc:mysql://scs-mysql:3306/scs?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/scs?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true"
       SPRING_DATASOURCE_USERNAME: scs
       SPRING_DATASOURCE_PASSWORD: scs
       AI_SERVICE_BASE_URL: "http://ai-service:8000"

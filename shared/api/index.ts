@@ -6,6 +6,7 @@
  */
 export {
   getApiBaseUrl,
+  getEffectiveApiBaseUrl,
   isApiConfigured,
   apiGet,
   apiPost,

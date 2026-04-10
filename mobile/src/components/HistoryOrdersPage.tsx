@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, Search, ChevronRight, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { THEME } from "../config/theme";
 import { listOrdersByUser } from "../api/orders";
 import { listVendors } from "../api/vendors";
 import { formatRelativeTime } from "../lib/utils";
-import { getBaseUrl } from "../api/client";
+import { getBaseUrl, isApiConfigured } from "../api/client";
 import { historyOrdersFallbackMock } from "../mocks/historyOrders";
+import { SCS_ORDERS_UPDATED } from "../lib/ordersEvents";
 
 type OrderRow = {
   id: number;
@@ -32,7 +33,7 @@ export function HistoryOrdersPage({
   onSelectOrder?: (order: { orderId?: number; vendorId?: number; totalAmount: number; vendorName?: string; image?: string }) => void;
 }) {
   const [orders, setOrders] = useState<OrderRow[]>(historyOrdersFallbackMock);
-  const [loading, setLoading] = useState(!!getBaseUrl());
+  const [loading, setLoading] = useState(isApiConfigured());
   const [search, setSearch] = useState("");
 
   const orderStatusToChinese = (status: string): string => {
@@ -41,8 +42,8 @@ export function HistoryOrdersPage({
     if (s === "confirmed" || s === "已接单") return "已接单";
     if (s === "preparing" || s === "cooking" || s === "制作中") return "制作中";
     if (s === "ready" || s === "待取餐") return "请取餐";
-    if (s === "completed" || s === "已完成" || s === "done") return "已完成";
-    return status || "已完成";
+    if (s === "completed" || s === "已完成" || s === "done") return "取餐成功";
+    return status || "取餐成功";
   };
 
   const isOrderCompleted = (status: string): boolean => {
@@ -50,54 +51,66 @@ export function HistoryOrdersPage({
     return s === "completed" || s === "已完成" || s === "done";
   };
 
-  useEffect(() => {
+  const fetchOrders = useCallback(async () => {
     const base = getBaseUrl();
-    if (!base || userId == null) {
+    if (!isApiConfigured() || userId == null) {
       setLoading(false);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const list = await listOrdersByUser(userId);
-        if (cancelled) return;
-        const vendors = await listVendors();
-        const baseNorm = base.replace(/\/$/, "");
-        const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
-        const vendorImageMap = new Map(
-          vendors.map((v) => {
-            const url =
-              v.imageUrl != null && v.imageUrl !== ""
-                ? v.imageUrl.startsWith("http")
-                  ? v.imageUrl
-                  : baseNorm + (v.imageUrl!.startsWith("/") ? v.imageUrl : "/" + v.imageUrl)
-                : `https://picsum.photos/seed/v${v.id}/100/100`;
-            return [v.id, url] as [number, string];
-          })
-        );
-        const rows: OrderRow[] = list
-          .filter((o) => isOrderCompleted(o.status ?? ""))
-          .map((o) => ({
-            id: o.id,
-            name: vendorMap.get(o.vendorId ?? 0) ?? "订单",
-            time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
-            price: String(o.totalAmount),
-            status: orderStatusToChinese(o.status ?? "已完成"),
-            image: vendorImageMap.get(o.vendorId ?? 0) ?? `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
-            items: `¥${o.totalAmount}`,
-            vendorId: o.vendorId,
-            totalAmount: Number(o.totalAmount),
-            reviewedAt: o.reviewedAt ?? null,
-          }));
-        setOrders(rows.length ? rows : historyOrdersFallbackMock);
-      } catch {
-        if (!cancelled) setOrders(historyOrdersFallbackMock);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+    setLoading(true);
+    try {
+      const list = await listOrdersByUser(userId);
+      const vendors = await listVendors();
+      const baseNorm = base.replace(/\/$/, "");
+      const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
+      const vendorImageMap = new Map(
+        vendors.map((v) => {
+          const url =
+            v.imageUrl != null && v.imageUrl !== ""
+              ? v.imageUrl.startsWith("http")
+                ? v.imageUrl
+                : baseNorm + (v.imageUrl!.startsWith("/") ? v.imageUrl : "/" + v.imageUrl)
+              : `https://picsum.photos/seed/v${v.id}/100/100`;
+          return [v.id, url] as [number, string];
+        })
+      );
+      const rows: OrderRow[] = list
+        .filter((o) => isOrderCompleted(o.status ?? ""))
+        .map((o) => ({
+          id: o.id,
+          name: vendorMap.get(o.vendorId ?? 0) ?? "订单",
+          time: o.placedAt ? formatRelativeTime(o.placedAt) : "",
+          price: String(o.totalAmount),
+          status: orderStatusToChinese(o.status ?? "已完成"),
+          image: vendorImageMap.get(o.vendorId ?? 0) ?? `https://picsum.photos/seed/v${o.vendorId ?? o.id}/100/100`,
+          items: `¥${o.totalAmount}`,
+          vendorId: o.vendorId,
+          totalAmount: Number(o.totalAmount),
+          reviewedAt: o.reviewedAt ?? null,
+        }));
+      setOrders(rows.length ? rows : historyOrdersFallbackMock);
+    } catch {
+      setOrders(historyOrdersFallbackMock);
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
+
+  useEffect(() => {
+    if (!isApiConfigured() || userId == null) {
+      setLoading(false);
+      return;
+    }
+    void fetchOrders();
+  }, [userId, fetchOrders]);
+
+  useEffect(() => {
+    const onUpdated = () => {
+      void fetchOrders();
+    };
+    window.addEventListener(SCS_ORDERS_UPDATED, onUpdated);
+    return () => window.removeEventListener(SCS_ORDERS_UPDATED, onUpdated);
+  }, [fetchOrders]);
 
   const searchLower = search.trim().toLowerCase();
   const filtered = searchLower
