@@ -10,6 +10,7 @@ import com.scs.repository.PostVectorIndexRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -59,19 +60,24 @@ public class PostVectorSearchService {
         log.info("[vector] rebuild start provider={}, model={}", embeddingProvider, embeddingModel);
         List<Post> posts = postRepository.findAll();
         int indexed = 0;
-        for (Post post : posts) {
-            String source = buildSourceText(post);
-            if (source.isBlank()) {
-                continue;
+        try {
+            for (Post post : posts) {
+                String source = buildSourceText(post);
+                if (source.isBlank()) {
+                    continue;
+                }
+                EmbeddingResult embeddingResult = embeddingWithFallback(source);
+                PostVectorIndex item = vectorIndexRepository.findByPostId(post.getId()).orElseGet(PostVectorIndex::new);
+                item.setPostId(post.getId());
+                item.setSourceText(source);
+                item.setModelName(embeddingResult.modelName);
+                item.setEmbeddingJson(toJson(embeddingResult.vector));
+                vectorIndexRepository.save(item);
+                indexed++;
             }
-            EmbeddingResult embeddingResult = embeddingWithFallback(source);
-            PostVectorIndex item = vectorIndexRepository.findByPostId(post.getId()).orElseGet(PostVectorIndex::new);
-            item.setPostId(post.getId());
-            item.setSourceText(source);
-            item.setModelName(embeddingResult.modelName);
-            item.setEmbeddingJson(toJson(embeddingResult.vector));
-            vectorIndexRepository.save(item);
-            indexed++;
+        } catch (DataAccessException e) {
+            log.warn("[vector] rebuild skipped (DB): {}", e.getMostSpecificCause().getMessage());
+            return 0;
         }
         log.info("[vector] rebuild done indexedCount={}", indexed);
         return indexed;
@@ -82,8 +88,15 @@ public class PostVectorSearchService {
             return Collections.emptyList();
         }
         float[] q = embeddingWithFallback(query).vector;
+        List<PostVectorIndex> indexRows;
+        try {
+            indexRows = vectorIndexRepository.findAll();
+        } catch (DataAccessException e) {
+            log.warn("[vector] search skipped (DB): {}", e.getMostSpecificCause().getMessage());
+            return Collections.emptyList();
+        }
         List<Scored> scoredList = new ArrayList<>();
-        for (PostVectorIndex idx : vectorIndexRepository.findAll()) {
+        for (PostVectorIndex idx : indexRows) {
             float[] v = parseEmbedding(idx.getEmbeddingJson());
             if (v == null || v.length != q.length) {
                 continue;

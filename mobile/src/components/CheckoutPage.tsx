@@ -53,41 +53,41 @@ export function CheckoutPage({
   const packageFee = 1;
   const finalPrice = totalPrice + packageFee + deliveryFee;
 
+  /** 前端演示用取餐码（不与后端队列号绑定） */
+  const makeDemoPickupCode = () => String(Math.floor(100000 + Math.random() * 900000));
+
   const handlePay = async () => {
-    if (!isApiConfigured()) {
-      setNotice({ kind: "info", message: "未配置后端地址（或同站 API），无法下单。请检查环境变量 VITE_API_BASE_URL 或 VITE_API_SAME_ORIGIN。" });
-      return;
-    }
-    if (userId == null) {
-      setNotice({ kind: "info", message: "请先登录后再下单。" });
-      return;
-    }
+    const pickupCode = makeDemoPickupCode();
     setIsPaying(true);
     try {
-      const deliveryFee = orderType === "delivery" ? 2 : 0;
-      const packageFee = 1;
-      const finalAmount = totalPrice + packageFee + deliveryFee;
-      const order = await createOrder({
-        userId,
-        vendorId: merchant.id,
-        totalAmount: finalAmount,
-        status: "completed",
-        queueNumber: "A" + Math.floor(100 + Math.random() * 900),
-      });
-      const entries = Object.entries(cart).filter(([, count]) => count > 0);
-      for (const [menuItemId, quantity] of entries) {
-        const item = menu.find((m) => m.id === Number(menuItemId));
-        if (item) {
-          await createOrderItem({
-            orderId: order.id,
-            menuItemId: item.id,
-            quantity,
-            priceEach: item.price,
-          });
+      if (isApiConfigured() && userId != null) {
+        const deliveryFeeAmt = orderType === "delivery" ? 2 : 0;
+        const packageFeeAmt = 1;
+        const finalAmount = totalPrice + packageFeeAmt + deliveryFeeAmt;
+        const order = await createOrder({
+          userId,
+          vendorId: merchant.id,
+          totalAmount: finalAmount,
+          status: "completed",
+          queueNumber: "A" + Math.floor(100 + Math.random() * 900),
+        });
+        const entries = Object.entries(cart).filter(([, count]) => count > 0);
+        for (const [menuItemId, quantity] of entries) {
+          const item = menu.find((m) => m.id === Number(menuItemId));
+          if (item) {
+            await createOrderItem({
+              orderId: order.id,
+              menuItemId: item.id,
+              quantity,
+              priceEach: item.price,
+            });
+          }
         }
+      } else {
+        // 无后端或未登录：仅前端演示，短延迟模拟支付
+        await new Promise((r) => setTimeout(r, 450));
       }
-      const qn = order.queueNumber ?? "";
-      setNotice({ kind: "success", queueNumber: qn });
+      setNotice({ kind: "success", queueNumber: pickupCode });
     } catch (e) {
       setNotice({
         kind: "error",
@@ -348,6 +348,7 @@ export function CheckoutPage({
               <div className="text-3xl font-bold tracking-wider text-gray-900 font-mono">
                 {notice.queueNumber}
               </div>
+              <div className="text-[11px] text-gray-400 mt-2">数字为本地随机生成，仅作界面演示</div>
             </div>
           ) : undefined
         }

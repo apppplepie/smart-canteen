@@ -18,8 +18,8 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onBack, onLogin }: LoginPageProps) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("1");
+  const [password, setPassword] = useState("123456");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
